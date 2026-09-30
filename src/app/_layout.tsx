@@ -257,13 +257,15 @@ export default function TabLayout() {
     }
 
     /*
-     * Logged-in member/admin OR
-     * Web Guest:
+     * ONLY a real Supabase session
+     * should redirect from Login to Home.
      *
-     * Login page -> Home.
+     * IMPORTANT:
+     * Web Guest must be allowed to
+     * open /login.
      */
     if (
-      (session || isGuest) &&
+      session &&
       pathname === '/login'
     ) {
       router.replace('/');
