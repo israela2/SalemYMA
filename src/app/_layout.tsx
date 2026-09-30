@@ -124,8 +124,7 @@ export default function TabLayout() {
   /*
    * WEB ONLY GUEST MODE
    *
-   * Guest mode is stored in sessionStorage
-   * so a new website session starts from Login.
+   * Guest mode is stored in sessionStorage.
    *
    * Android/iOS will always keep
    * isGuest = false.
@@ -156,11 +155,7 @@ export default function TabLayout() {
           await supabase.auth.getSession();
 
         /*
-         * Guest Mode is checked ONLY on Web.
-         *
-         * sessionStorage is intentional:
-         * opening the website as a new browser
-         * session will show Login again.
+         * Check Guest Mode only on Web.
          */
         let webGuest = false;
 
@@ -211,8 +206,8 @@ export default function TabLayout() {
           setSession(newSession);
 
           /*
-           * If a real Supabase account
-           * logs in, remove Web Guest Mode.
+           * Real Supabase login:
+           * remove Guest Mode.
            */
           if (
             Platform.OS === 'web' &&
@@ -240,6 +235,13 @@ export default function TabLayout() {
 
   /*
    * AUTH REDIRECT
+   *
+   * IMPORTANT:
+   * Read sessionStorage directly before
+   * redirecting.
+   *
+   * This fixes the first-time Guest Login
+   * race condition.
    */
   useEffect(() => {
     if (checkingAuth) {
@@ -247,16 +249,40 @@ export default function TabLayout() {
     }
 
     /*
-     * No Supabase session and
-     * no Web Guest Mode:
+     * Always get the latest Guest Mode
+     * directly from sessionStorage on Web.
+     */
+    let guestMode = isGuest;
+
+    if (
+      Platform.OS === 'web' &&
+      typeof window !== 'undefined' &&
+      typeof window.sessionStorage !==
+        'undefined'
+    ) {
+      guestMode =
+        window.sessionStorage.getItem(
+          GUEST_KEY,
+        ) === 'true';
+
+      /*
+       * Keep React state synchronized.
+       */
+      if (guestMode !== isGuest) {
+        setIsGuest(guestMode);
+      }
+    }
+
+    /*
+     * No real session
+     * AND no Guest Mode
+     * AND not a public page
      *
-     * send user to Login.
-     *
-     * Mobile never has isGuest=true.
+     * -> Login
      */
     if (
       !session &&
-      !isGuest &&
+      !guestMode &&
       !isPublicPage
     ) {
       router.replace('/login');
@@ -265,11 +291,10 @@ export default function TabLayout() {
 
     /*
      * ONLY a real Supabase session
-     * should redirect from Login to Home.
+     * redirects Login -> Home.
      *
-     * IMPORTANT:
-     * Web Guest must be allowed to
-     * open /login.
+     * Guest users are allowed to open
+     * Login page.
      */
     if (
       session &&
@@ -331,14 +356,21 @@ export default function TabLayout() {
         headerShown: false,
 
         tabBarActiveTintColor: '#C62828',
+
         tabBarInactiveTintColor: '#777777',
 
         /*
-         * Hide bottom tab bar on public pages.
+         * LOGIN / ADMIN SIGNUP
+         *
+         * Bottom navigation completely hidden.
+         *
+         * Other pages keep the existing
+         * navigation design.
          */
         tabBarStyle: isPublicPage
           ? {
               display: 'none',
+              height: 0,
             }
           : {
               height: 72,
@@ -368,6 +400,10 @@ export default function TabLayout() {
         },
       }}
     >
+      {/* =========================
+          MAIN NAVIGATION
+          ========================= */}
+
       <Tabs.Screen
         name="index"
         options={{
@@ -431,6 +467,10 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* =========================
+          HIDDEN / INTERNAL ROUTES
+          ========================= */}
 
       <Tabs.Screen
         name="zonun"
