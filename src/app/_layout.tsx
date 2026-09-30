@@ -1,8 +1,20 @@
-import { Tabs, router, usePathname } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import {
+  Tabs,
+  router,
+  usePathname,
+} from 'expo-router';
 
-import { supabase } from '../lib/supabase';
+import { useEffect, useState } from 'react';
+
+import {
+  Platform,
+  Text,
+  View,
+} from 'react-native';
+
+
+const GUEST_KEY =
+  'salem_yma_guest_mode';
 
 function TabIcon({
   icon,
@@ -109,6 +121,14 @@ export default function TabLayout() {
     useState(true);
 
   /*
+   * WEB ONLY GUEST MODE
+   *
+   * Mobile app does not use Guest Mode.
+   */
+  const [isGuest, setIsGuest] =
+    useState(false);
+
+  /*
    * PUBLIC PAGES
    *
    * User does not need to be logged in
@@ -126,67 +146,70 @@ export default function TabLayout() {
   useEffect(() => {
     let mounted = true;
 
-    async function checkSession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+async function loginAsGuest() {
+  if (Platform.OS !== 'web') {
+    return;
+  }
 
-      if (mounted) {
-        setSession(session);
-        setCheckingAuth(false);
-      }
+  if (guestLoading) {
+    return;
+  }
+
+  setGuestLoading(true);
+  setMessage('');
+
+  try {
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.localStorage !== 'undefined'
+    ) {
+      window.localStorage.setItem(
+        GUEST_KEY,
+        'true',
+      );
+
+      /*
+       * Use a full Web navigation here.
+       * This makes _layout.tsx read the saved
+       * Guest Mode flag again from localStorage.
+       *
+       * This code runs ONLY on Web.
+       * Android/iOS cannot reach this block.
+       */
+      window.location.href = '/';
+      return;
     }
 
-    checkSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
-        setSession(newSession);
-        setCheckingAuth(false);
-      }
+    setGuestLoading(false);
+  } catch (error) {
+    console.log(
+      'Guest login error:',
+      error,
     );
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+    setGuestLoading(false);
 
-  /*
-   * AUTH REDIRECT
-   */
-  useEffect(() => {
-    if (checkingAuth) {
-      return;
-    }
+    setMessage(
+      'Guest login-ah harsatna a awm. Tih leh rawh.',
+    );
+  }
+}
 
     /*
-     * No session:
-     * allow Login + Admin Sign Up.
-     */
-    if (!session && !isPublicPage) {
-      router.replace('/login');
-      return;
-    }
-
-    /*
-     * Logged-in user:
-     * Login page -> Home.
+     * Logged-in member/admin OR
+     * Web Guest:
      *
-     * IMPORTANT:
-     * Do NOT redirect /admin-signup.
-     * This allows the admin request page to open.
+     * Login page -> Home.
      */
     if (
-      session &&
+      (session || isGuest) &&
       pathname === '/login'
     ) {
       router.replace('/');
     }
   }, [
     session,
+    isGuest,
     checkingAuth,
     isPublicPage,
     pathname,
