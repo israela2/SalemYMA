@@ -124,6 +124,9 @@ export default function TabLayout() {
   /*
    * WEB ONLY GUEST MODE
    *
+   * Guest mode is stored in sessionStorage
+   * so a new website session starts from Login.
+   *
    * Android/iOS will always keep
    * isGuest = false.
    */
@@ -154,17 +157,21 @@ export default function TabLayout() {
 
         /*
          * Guest Mode is checked ONLY on Web.
+         *
+         * sessionStorage is intentional:
+         * opening the website as a new browser
+         * session will show Login again.
          */
         let webGuest = false;
 
         if (
           Platform.OS === 'web' &&
           typeof window !== 'undefined' &&
-          typeof window.localStorage !==
+          typeof window.sessionStorage !==
             'undefined'
         ) {
           webGuest =
-            window.localStorage.getItem(
+            window.sessionStorage.getItem(
               GUEST_KEY,
             ) === 'true';
         }
@@ -211,10 +218,10 @@ export default function TabLayout() {
             Platform.OS === 'web' &&
             newSession &&
             typeof window !== 'undefined' &&
-            typeof window.localStorage !==
+            typeof window.sessionStorage !==
               'undefined'
           ) {
-            window.localStorage.removeItem(
+            window.sessionStorage.removeItem(
               GUEST_KEY,
             );
 

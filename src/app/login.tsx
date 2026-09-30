@@ -17,7 +17,8 @@ import { useState } from 'react';
 
 import { supabase } from '../lib/supabase';
 
-const GUEST_KEY = 'salem_yma_guest_mode';
+const GUEST_KEY =
+  'salem_yma_guest_mode';
 
 const sections = [
   'Section - I',
@@ -26,28 +27,57 @@ const sections = [
 ];
 
 export default function LoginScreen() {
-  const [isRegister, setIsRegister] = useState(false);
+  const [isRegister, setIsRegister] =
+    useState(false);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [section, setSection] = useState('');
+  const [email, setEmail] =
+    useState('');
 
-  const [loading, setLoading] = useState(false);
-  const [guestLoading, setGuestLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [password, setPassword] =
+    useState('');
 
+  const [fullName, setFullName] =
+    useState('');
+
+  const [phone, setPhone] =
+    useState('');
+
+  const [section, setSection] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [guestLoading, setGuestLoading] =
+    useState(false);
+
+  const [message, setMessage] =
+    useState('');
+
+  /*
+   * REMOVE GUEST MODE
+   *
+   * Web:
+   * localStorage
+   *
+   * Mobile:
+   * AsyncStorage
+   */
   async function removeGuestMode() {
     try {
       if (
         Platform.OS === 'web' &&
         typeof window !== 'undefined' &&
-        typeof window.localStorage !== 'undefined'
+        typeof window.sessionStorage !==
+          'undefined'
       ) {
-        window.localStorage.removeItem(GUEST_KEY);
+        window.localStorage.removeItem(
+          GUEST_KEY,
+        );
       } else {
-        await AsyncStorage.removeItem(GUEST_KEY);
+        await AsyncStorage.removeItem(
+          GUEST_KEY,
+        );
       }
     } catch (error) {
       console.log(
@@ -57,41 +87,77 @@ export default function LoginScreen() {
     }
   }
 
+  /*
+   * MEMBER LOGIN / REGISTER
+   */
   async function handleAuth() {
-    if (!email.trim() || !password) {
-      setMessage('Email leh password dah rawh.');
+    if (
+      !email.trim() ||
+      !password
+    ) {
+      setMessage(
+        'Email leh password dah rawh.',
+      );
       return;
     }
 
-    if (isRegister && !fullName.trim()) {
-      setMessage('Full name dah rawh.');
+    if (
+      isRegister &&
+      !fullName.trim()
+    ) {
+      setMessage(
+        'Full name dah rawh.',
+      );
       return;
     }
 
-    if (isRegister && !phone.trim()) {
-      setMessage('Phone number dah rawh.');
+    if (
+      isRegister &&
+      !phone.trim()
+    ) {
+      setMessage(
+        'Phone number dah rawh.',
+      );
       return;
     }
 
-    if (isRegister && phone.trim().length < 8) {
-      setMessage('Phone number dik tak dah rawh.');
+    if (
+      isRegister &&
+      phone.trim().length < 8
+    ) {
+      setMessage(
+        'Phone number dik tak dah rawh.',
+      );
       return;
     }
 
-    if (isRegister && !section) {
-      setMessage('Section thlang rawh.');
+    if (
+      isRegister &&
+      !section
+    ) {
+      setMessage(
+        'Section thlang rawh.',
+      );
       return;
     }
 
     setLoading(true);
     setMessage('');
 
-    // Normal Member Login/Register removes Guest Mode.
+    /*
+     * Real Member Login/Register
+     * removes Guest Mode.
+     */
     await removeGuestMode();
 
+    /*
+     * MEMBER REGISTRATION
+     */
     if (isRegister) {
       const cleanEmail =
-        email.trim().toLowerCase();
+        email
+          .trim()
+          .toLowerCase();
 
       const cleanName =
         fullName.trim();
@@ -99,7 +165,10 @@ export default function LoginScreen() {
       const cleanPhone =
         phone.trim();
 
-      const { data, error } =
+      const {
+        data,
+        error,
+      } =
         await supabase.auth.signUp({
           email: cleanEmail,
           password,
@@ -114,7 +183,9 @@ export default function LoginScreen() {
 
       if (error) {
         setLoading(false);
-        setMessage(error.message);
+        setMessage(
+          error.message,
+        );
         return;
       }
 
@@ -131,7 +202,12 @@ export default function LoginScreen() {
         return;
       }
 
-      const { error: memberError } =
+      /*
+       * SAVE MEMBER INFORMATION
+       */
+      const {
+        error: memberError,
+      } =
         await supabase
           .from('members')
           .insert({
@@ -139,7 +215,7 @@ export default function LoginScreen() {
             full_name: cleanName,
             phone: cleanPhone,
             email: cleanEmail,
-            section: section,
+            section,
             branch_name:
               'Salem YMA Branch',
             status: 'Active',
@@ -160,6 +236,10 @@ export default function LoginScreen() {
         return;
       }
 
+      /*
+       * If Supabase immediately gives
+       * a session, go Home.
+       */
       if (data.session) {
         router.replace('/');
         return;
@@ -172,29 +252,55 @@ export default function LoginScreen() {
       return;
     }
 
-    const { error } =
+    /*
+     * MEMBER LOGIN
+     */
+    const {
+      error,
+    } =
       await supabase.auth.signInWithPassword({
         email:
-          email.trim().toLowerCase(),
+          email
+            .trim()
+            .toLowerCase(),
         password,
       });
 
     setLoading(false);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(
+        error.message,
+      );
       return;
     }
 
+    /*
+     * Successful real login
+     * goes to Home.
+     */
     router.replace('/');
   }
 
-  // --------------------------------------------------
-  // WEBSITE ONLY — LOGIN AS GUEST
-  // --------------------------------------------------
-
-  async function loginAsGuest() {
-  if (Platform.OS !== 'web') {
+  /*
+   * ==================================================
+   * WEBSITE ONLY — LOGIN AS GUEST
+   * ==================================================
+   *
+   * IMPORTANT:
+   * This function can only run on Web.
+   *
+   * Guest mode is saved in localStorage.
+   *
+   * ?guest=true tells the website that
+   * the Home page was entered intentionally
+   * through the Guest button.
+   */
+  
+async function loginAsGuest() {
+  if (
+    Platform.OS !== 'web'
+  ) {
     return;
   }
 
@@ -208,21 +314,28 @@ export default function LoginScreen() {
   try {
     if (
       typeof window !== 'undefined' &&
-      typeof window.localStorage !== 'undefined'
+      typeof window.sessionStorage !==
+        'undefined'
     ) {
-      window.localStorage.setItem(
+      window.sessionStorage.setItem(
         GUEST_KEY,
         'true',
       );
 
-      // Make sure the browser has saved the guest flag
-      // before navigating to the website home page.
-      await new Promise((resolve) =>
-        setTimeout(resolve, 50),
+      /*
+       * Navigate to Home as Guest.
+       *
+       * ?guest=true is used only for
+       * the intentional Guest entry.
+       */
+      router.replace(
+        '/?guest=true',
       );
+
+      return;
     }
 
-    router.replace('/');
+    setGuestLoading(false);
   } catch (error) {
     console.log(
       'Guest login error:',
@@ -237,21 +350,29 @@ export default function LoginScreen() {
   }
 }
 
-
+  /*
+   * ADMIN SIGN UP
+   */
   function openAdminSignup() {
     setMessage('');
 
-    router.push('/admin-signup');
+    router.push(
+      '/admin-signup',
+    );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+    >
       <ScrollView
         contentContainerStyle={
           styles.scrollContent
         }
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={
+          false
+        }
       >
         {/* =========================
             HEADER
@@ -263,28 +384,52 @@ export default function LoginScreen() {
             '#8E1B1B',
             '#0B0B0B',
           ]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          start={{
+            x: 0,
+            y: 0,
+          }}
+          end={{
+            x: 1,
+            y: 1,
+          }}
           style={styles.hero}
         >
           <Image
             source={require('../../assets/images/yma-logo.png')}
-            style={styles.backgroundLogo}
+            style={
+              styles.backgroundLogo
+            }
             resizeMode="contain"
           />
 
-          <View style={styles.heroContent}>
-            <Text style={styles.brand}>
+          <View
+            style={
+              styles.heroContent
+            }
+          >
+            <Text
+              style={styles.brand}
+            >
               YMA SALEM BRANCH
             </Text>
 
-            <Text style={styles.heroSubtitle}>
+            <Text
+              style={
+                styles.heroSubtitle
+              }
+            >
               Young Mizo Association
             </Text>
 
-            <View style={styles.divider} />
+            <View
+              style={styles.divider}
+            />
 
-            <Text style={styles.heroMessage}>
+            <Text
+              style={
+                styles.heroMessage
+              }
+            >
               {isRegister
                 ? 'Join the Salem YMA community'
                 : 'Welcome back to Salem YMA'}
@@ -296,15 +441,25 @@ export default function LoginScreen() {
             FORM
         ========================= */}
 
-        <View style={styles.formCard}>
-          <View style={styles.formHeader}>
-            <Text style={styles.formTitle}>
+        <View
+          style={styles.formCard}
+        >
+          <View
+            style={styles.formHeader}
+          >
+            <Text
+              style={styles.formTitle}
+            >
               {isRegister
                 ? 'Create Account'
                 : 'Member Login'}
             </Text>
 
-            <Text style={styles.formSubtitle}>
+            <Text
+              style={
+                styles.formSubtitle
+              }
+            >
               {isRegister
                 ? 'Create your Salem YMA member account'
                 : 'Login to access your Salem YMA account'}
@@ -319,8 +474,12 @@ export default function LoginScreen() {
             <>
               {/* FULL NAME */}
 
-              <View style={styles.field}>
-                <Text style={styles.label}>
+              <View
+                style={styles.field}
+              >
+                <Text
+                  style={styles.label}
+                >
                   FULL NAME
                 </Text>
 
@@ -338,8 +497,12 @@ export default function LoginScreen() {
 
               {/* PHONE */}
 
-              <View style={styles.field}>
-                <Text style={styles.label}>
+              <View
+                style={styles.field}
+              >
+                <Text
+                  style={styles.label}
+                >
                   PHONE NUMBER
                 </Text>
 
@@ -349,14 +512,20 @@ export default function LoginScreen() {
                   placeholderTextColor="#999999"
                   keyboardType="phone-pad"
                   value={phone}
-                  onChangeText={setPhone}
+                  onChangeText={
+                    setPhone
+                  }
                 />
               </View>
 
               {/* SECTION */}
 
-              <View style={styles.field}>
-                <Text style={styles.label}>
+              <View
+                style={styles.field}
+              >
+                <Text
+                  style={styles.label}
+                >
                   SECTION
                 </Text>
 
@@ -368,7 +537,8 @@ export default function LoginScreen() {
                   {sections.map(
                     (item) => {
                       const selected =
-                        section === item;
+                        section ===
+                        item;
 
                       return (
                         <Pressable
@@ -426,8 +596,12 @@ export default function LoginScreen() {
               EMAIL
           ========================= */}
 
-          <View style={styles.field}>
-            <Text style={styles.label}>
+          <View
+            style={styles.field}
+          >
+            <Text
+              style={styles.label}
+            >
               EMAIL ADDRESS
             </Text>
 
@@ -439,7 +613,9 @@ export default function LoginScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={
+                setEmail
+              }
             />
           </View>
 
@@ -447,8 +623,12 @@ export default function LoginScreen() {
               PASSWORD
           ========================= */}
 
-          <View style={styles.field}>
-            <Text style={styles.label}>
+          <View
+            style={styles.field}
+          >
+            <Text
+              style={styles.label}
+            >
               PASSWORD
             </Text>
 
@@ -458,7 +638,9 @@ export default function LoginScreen() {
               placeholderTextColor="#999999"
               secureTextEntry
               value={password}
-              onChangeText={setPassword}
+              onChangeText={
+                setPassword
+              }
             />
           </View>
 
@@ -467,8 +649,16 @@ export default function LoginScreen() {
           ========================= */}
 
           {message ? (
-            <View style={styles.messageBox}>
-              <Text style={styles.messageText}>
+            <View
+              style={
+                styles.messageBox
+              }
+            >
+              <Text
+                style={
+                  styles.messageText
+                }
+              >
                 {message}
               </Text>
             </View>
@@ -481,7 +671,9 @@ export default function LoginScreen() {
           <Pressable
             onPress={handleAuth}
             disabled={loading}
-            style={({ pressed }) => [
+            style={({
+              pressed,
+            }) => [
               styles.buttonWrap,
               pressed &&
                 styles.buttonPressed,
@@ -493,9 +685,17 @@ export default function LoginScreen() {
                 '#8E1B1B',
                 '#111111',
               ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.loginButton}
+              start={{
+                x: 0,
+                y: 0,
+              }}
+              end={{
+                x: 1,
+                y: 0,
+              }}
+              style={
+                styles.loginButton
+              }
             >
               <Text
                 style={
@@ -515,9 +715,13 @@ export default function LoginScreen() {
               MEMBER SWITCH
           ========================= */}
 
-          <View style={styles.switchArea}>
+          <View
+            style={styles.switchArea}
+          >
             <Text
-              style={styles.switchLabel}
+              style={
+                styles.switchLabel
+              }
             >
               {isRegister
                 ? 'Already have an account?'
@@ -534,7 +738,9 @@ export default function LoginScreen() {
               }}
             >
               <Text
-                style={styles.switchText}
+                style={
+                  styles.switchText
+                }
               >
                 {isRegister
                   ? ' Login'
@@ -580,8 +786,12 @@ export default function LoginScreen() {
               </View>
 
               <Pressable
-                onPress={loginAsGuest}
-                disabled={guestLoading}
+                onPress={
+                  loginAsGuest
+                }
+                disabled={
+                  guestLoading
+                }
                 style={({
                   pressed,
                 }) => [
@@ -662,7 +872,9 @@ export default function LoginScreen() {
               />
 
               <Text
-                style={styles.adminOrText}
+                style={
+                  styles.adminOrText
+                }
               >
                 ADMIN
               </Text>
@@ -675,8 +887,12 @@ export default function LoginScreen() {
             </View>
 
             <Pressable
-              onPress={openAdminSignup}
-              style={({ pressed }) => [
+              onPress={
+                openAdminSignup
+              }
+              style={({
+                pressed,
+              }) => [
                 styles.adminSignupButton,
                 pressed &&
                   styles.adminSignupPressed,
@@ -733,24 +949,36 @@ export default function LoginScreen() {
             FOOTER
         ========================= */}
 
-        <View style={styles.footer}>
-          <Text style={styles.footerTitle}>
+        <View
+          style={styles.footer}
+        >
+          <Text
+            style={styles.footerTitle}
+          >
             YMA SALEM BRANCH
           </Text>
 
-          <Text style={styles.footerText}>
+          <Text
+            style={styles.footerText}
+          >
             Hun âwl hman ṭhat
           </Text>
 
-          <Text style={styles.footerText}>
+          <Text
+            style={styles.footerText}
+          >
             Zo fâte hma-sâwnna ngaihtuah
           </Text>
 
-          <Text style={styles.footerText}>
+          <Text
+            style={styles.footerText}
+          >
             Kristian nun dan ṭha ngaihsan
           </Text>
 
-          <Text style={styles.footerSmall}>
+          <Text
+            style={styles.footerSmall}
+          >
             YMA SALEM BRANCH Mobile Application
           </Text>
         </View>
@@ -759,463 +987,464 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 25,
-  },
-
-  /* =========================
-      HERO
-  ========================= */
-
-  hero: {
-    position: 'relative',
-    overflow: 'hidden',
-    paddingTop: 55,
-    paddingBottom: 55,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-  },
-
-  backgroundLogo: {
-    position: 'absolute',
-    width: 330,
-    height: 330,
-    opacity: 0.5,
-    alignSelf: 'center',
-    top: 18,
-  },
-
-  heroContent: {
-    alignItems: 'center',
-    zIndex: 2,
-  },
-
-  brand: {
-    color: '#FFFFFF',
-    fontSize: 27,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-    textAlign: 'center',
-  },
-
-  heroSubtitle: {
-    color: '#F5F5F5',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 5,
-    letterSpacing: 0.4,
-  },
-
-  divider: {
-    width: 42,
-    height: 3,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 2,
-    marginTop: 18,
-    marginBottom: 14,
-  },
-
-  heroMessage: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-
-  /* =========================
-      FORM CARD
-  ========================= */
-
-  formCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 18,
-    marginTop: -18,
-    borderRadius: 20,
-    padding: 22,
-
-    shadowColor: '#000000',
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    shadowOffset: {
-      width: 0,
-      height: 6,
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#F5F5F5',
     },
 
-    elevation: 7,
-  },
+    scrollContent: {
+      flexGrow: 1,
+      paddingBottom: 25,
+    },
 
-  formHeader: {
-    marginBottom: 22,
-  },
+    /* =========================
+        HERO
+    ========================= */
 
-  formTitle: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#111111',
-  },
+    hero: {
+      position: 'relative',
+      overflow: 'hidden',
+      paddingTop: 55,
+      paddingBottom: 55,
+      paddingHorizontal: 24,
+      alignItems: 'center',
+    },
 
-  formSubtitle: {
-    fontSize: 11,
-    color: '#777777',
-    marginTop: 5,
-    lineHeight: 16,
-  },
+    backgroundLogo: {
+      position: 'absolute',
+      width: 330,
+      height: 330,
+      opacity: 0.5,
+      alignSelf: 'center',
+      top: 18,
+    },
 
-  /* =========================
-      INPUT
-  ========================= */
+    heroContent: {
+      alignItems: 'center',
+      zIndex: 2,
+    },
 
-  field: {
-    marginBottom: 15,
-  },
+    brand: {
+      color: '#FFFFFF',
+      fontSize: 27,
+      fontWeight: '900',
+      letterSpacing: 1.5,
+      textAlign: 'center',
+    },
 
-  label: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#555555',
-    letterSpacing: 0.8,
-    marginBottom: 7,
-  },
+    heroSubtitle: {
+      color: '#F5F5F5',
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 5,
+      letterSpacing: 0.4,
+    },
 
-  input: {
-    height: 52,
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    fontSize: 13,
-    color: '#111111',
-    borderWidth: 1,
-    borderColor: '#E4E4E4',
-  },
+    divider: {
+      width: 42,
+      height: 3,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 2,
+      marginTop: 18,
+      marginBottom: 14,
+    },
 
-  /* =========================
-      SECTION
-  ========================= */
+    heroMessage: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
 
-  sectionOptions: {
-    marginTop: 1,
-  },
+    /* =========================
+        FORM CARD
+    ========================= */
 
-  sectionOption: {
-    minHeight: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E4E4E4',
-    backgroundColor: '#F8F8F8',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    marginBottom: 8,
-  },
+    formCard: {
+      backgroundColor: '#FFFFFF',
+      marginHorizontal: 18,
+      marginTop: -18,
+      borderRadius: 20,
+      padding: 22,
 
-  sectionOptionSelected: {
-    borderColor: '#C62828',
-    backgroundColor: '#FBEAEA',
-  },
+      shadowColor: '#000000',
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
 
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#AAAAAA',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 11,
-  },
+      elevation: 7,
+    },
 
-  radioSelected: {
-    borderColor: '#C62828',
-  },
+    formHeader: {
+      marginBottom: 22,
+    },
 
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#C62828',
-  },
+    formTitle: {
+      fontSize: 22,
+      fontWeight: '900',
+      color: '#111111',
+    },
 
-  sectionOptionText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#555555',
-  },
+    formSubtitle: {
+      fontSize: 11,
+      color: '#777777',
+      marginTop: 5,
+      lineHeight: 16,
+    },
 
-  sectionOptionTextSelected: {
-    color: '#8E1B1B',
-    fontWeight: '900',
-  },
+    /* =========================
+        INPUT
+    ========================= */
 
-  /* =========================
-      MESSAGE
-  ========================= */
+    field: {
+      marginBottom: 15,
+    },
 
-  messageBox: {
-    backgroundColor: '#FBEAEA',
-    borderLeftWidth: 3,
-    borderLeftColor: '#C62828',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 15,
-  },
+    label: {
+      fontSize: 10,
+      fontWeight: '900',
+      color: '#555555',
+      letterSpacing: 0.8,
+      marginBottom: 7,
+    },
 
-  messageText: {
-    fontSize: 11,
-    color: '#8E1B1B',
-    lineHeight: 17,
-  },
+    input: {
+      height: 52,
+      backgroundColor: '#F8F8F8',
+      borderRadius: 12,
+      paddingHorizontal: 15,
+      fontSize: 13,
+      color: '#111111',
+      borderWidth: 1,
+      borderColor: '#E4E4E4',
+    },
 
-  /* =========================
-      LOGIN BUTTON
-  ========================= */
+    /* =========================
+        SECTION
+    ========================= */
 
-  buttonWrap: {
-    borderRadius: 13,
-    overflow: 'hidden',
-    marginTop: 3,
-  },
+    sectionOptions: {
+      marginTop: 1,
+    },
 
-  buttonPressed: {
-    opacity: 0.85,
-  },
+    sectionOption: {
+      minHeight: 48,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#E4E4E4',
+      backgroundColor: '#F8F8F8',
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      marginBottom: 8,
+    },
 
-  loginButton: {
-    height: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    sectionOptionSelected: {
+      borderColor: '#C62828',
+      backgroundColor: '#FBEAEA',
+    },
 
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
+    radio: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: '#AAAAAA',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 11,
+    },
 
-  /* =========================
-      MEMBER SWITCH
-  ========================= */
+    radioSelected: {
+      borderColor: '#C62828',
+    },
 
-  switchArea: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
+    radioInner: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: '#C62828',
+    },
 
-  switchLabel: {
-    fontSize: 11,
-    color: '#777777',
-  },
+    sectionOptionText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#555555',
+    },
 
-  switchText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#C62828',
-  },
+    sectionOptionTextSelected: {
+      color: '#8E1B1B',
+      fontWeight: '900',
+    },
 
-  /* =========================
-      WEBSITE GUEST LOGIN
-  ========================= */
+    /* =========================
+        MESSAGE
+    ========================= */
 
-  guestLoginArea: {
-    marginTop: 25,
-  },
+    messageBox: {
+      backgroundColor: '#FBEAEA',
+      borderLeftWidth: 3,
+      borderLeftColor: '#C62828',
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 15,
+    },
 
-  guestDividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
+    messageText: {
+      fontSize: 11,
+      color: '#8E1B1B',
+      lineHeight: 17,
+    },
 
-  guestDivider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E5E5',
-  },
+    /* =========================
+        LOGIN BUTTON
+    ========================= */
 
-  guestOrText: {
-    marginHorizontal: 10,
-    fontSize: 8,
-    fontWeight: '900',
-    color: '#999999',
-    letterSpacing: 1.2,
-  },
+    buttonWrap: {
+      borderRadius: 13,
+      overflow: 'hidden',
+      marginTop: 3,
+    },
 
-  guestLoginButton: {
-    minHeight: 68,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 14,
-    backgroundColor: '#FAFAFA',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 13,
-  },
+    buttonPressed: {
+      opacity: 0.85,
+    },
 
-  guestLoginPressed: {
-    opacity: 0.75,
-    backgroundColor: '#F2F2F2',
-  },
+    loginButton: {
+      height: 54,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  guestLoginDisabled: {
-    opacity: 0.55,
-  },
+    loginButtonText: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '900',
+      letterSpacing: 0.8,
+    },
 
-  guestIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#FBEAEA',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
+    /* =========================
+        MEMBER SWITCH
+    ========================= */
 
-  guestLoginIcon: {
-    fontSize: 18,
-  },
+    switchArea: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 20,
+    },
 
-  guestLoginContent: {
-    flex: 1,
-  },
+    switchLabel: {
+      fontSize: 11,
+      color: '#777777',
+    },
 
-  guestLoginTitle: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#222222',
-  },
+    switchText: {
+      fontSize: 11,
+      fontWeight: '900',
+      color: '#C62828',
+    },
 
-  guestLoginSubtitle: {
-    fontSize: 9,
-    color: '#888888',
-    marginTop: 4,
-    lineHeight: 13,
-  },
+    /* =========================
+        WEBSITE GUEST LOGIN
+    ========================= */
 
-  guestLoginArrow: {
-    fontSize: 26,
-    fontWeight: '300',
-    color: '#C62828',
-    marginLeft: 8,
-  },
+    guestLoginArea: {
+      marginTop: 25,
+    },
 
-  /* =========================
-      ADMIN SIGN UP
-  ========================= */
+    guestDividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 14,
+    },
 
-  adminSignupArea: {
-    marginTop: 25,
-  },
+    guestDivider: {
+      flex: 1,
+      height: 1,
+      backgroundColor: '#E5E5E5',
+    },
 
-  adminDividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
+    guestOrText: {
+      marginHorizontal: 10,
+      fontSize: 8,
+      fontWeight: '900',
+      color: '#999999',
+      letterSpacing: 1.2,
+    },
 
-  adminDivider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E5E5',
-  },
+    guestLoginButton: {
+      minHeight: 68,
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      borderRadius: 14,
+      backgroundColor: '#FAFAFA',
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 13,
+    },
 
-  adminOrText: {
-    marginHorizontal: 10,
-    fontSize: 8,
-    fontWeight: '900',
-    color: '#999999',
-    letterSpacing: 1.2,
-  },
+    guestLoginPressed: {
+      opacity: 0.75,
+      backgroundColor: '#F2F2F2',
+    },
 
-  adminSignupButton: {
-    minHeight: 68,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 14,
-    backgroundColor: '#FAFAFA',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 13,
-  },
+    guestLoginDisabled: {
+      opacity: 0.55,
+    },
 
-  adminSignupPressed: {
-    opacity: 0.75,
-    backgroundColor: '#F2F2F2',
-  },
+    guestIconBox: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: '#FBEAEA',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
 
-  adminIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#FBEAEA',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
+    guestLoginIcon: {
+      fontSize: 18,
+    },
 
-  adminSignupIcon: {
-    fontSize: 18,
-  },
+    guestLoginContent: {
+      flex: 1,
+    },
 
-  adminSignupContent: {
-    flex: 1,
-  },
+    guestLoginTitle: {
+      fontSize: 12,
+      fontWeight: '900',
+      color: '#222222',
+    },
 
-  adminSignupTitle: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#222222',
-  },
+    guestLoginSubtitle: {
+      fontSize: 9,
+      color: '#888888',
+      marginTop: 4,
+      lineHeight: 13,
+    },
 
-  adminSignupSubtitle: {
-    fontSize: 9,
-    color: '#888888',
-    marginTop: 4,
-    lineHeight: 13,
-  },
+    guestLoginArrow: {
+      fontSize: 26,
+      fontWeight: '300',
+      color: '#C62828',
+      marginLeft: 8,
+    },
 
-  adminSignupArrow: {
-    fontSize: 26,
-    fontWeight: '300',
-    color: '#C62828',
-    marginLeft: 8,
-  },
+    /* =========================
+        ADMIN SIGN UP
+    ========================= */
 
-  /* =========================
-      FOOTER
-  ========================= */
+    adminSignupArea: {
+      marginTop: 25,
+    },
 
-  footer: {
-    alignItems: 'center',
-    paddingTop: 28,
-    paddingHorizontal: 20,
-  },
+    adminDividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 14,
+    },
 
-  footerTitle: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#111111',
-    letterSpacing: 1,
-  },
+    adminDivider: {
+      flex: 1,
+      height: 1,
+      backgroundColor: '#E5E5E5',
+    },
 
-  footerText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#777777',
-    marginTop: 4,
-  },
+    adminOrText: {
+      marginHorizontal: 10,
+      fontSize: 8,
+      fontWeight: '900',
+      color: '#999999',
+      letterSpacing: 1.2,
+    },
 
-  footerSmall: {
-    fontSize: 9,
-    color: '#AAAAAA',
-    marginTop: 8,
-  },
-});
+    adminSignupButton: {
+      minHeight: 68,
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      borderRadius: 14,
+      backgroundColor: '#FAFAFA',
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 13,
+    },
+
+    adminSignupPressed: {
+      opacity: 0.75,
+      backgroundColor: '#F2F2F2',
+    },
+
+    adminIconBox: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: '#FBEAEA',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+
+    adminSignupIcon: {
+      fontSize: 18,
+    },
+
+    adminSignupContent: {
+      flex: 1,
+    },
+
+    adminSignupTitle: {
+      fontSize: 12,
+      fontWeight: '900',
+      color: '#222222',
+    },
+
+    adminSignupSubtitle: {
+      fontSize: 9,
+      color: '#888888',
+      marginTop: 4,
+      lineHeight: 13,
+    },
+
+    adminSignupArrow: {
+      fontSize: 26,
+      fontWeight: '300',
+      color: '#C62828',
+      marginLeft: 8,
+    },
+
+    /* =========================
+        FOOTER
+    ========================= */
+
+    footer: {
+      alignItems: 'center',
+      paddingTop: 28,
+      paddingHorizontal: 20,
+    },
+
+    footerTitle: {
+      fontSize: 12,
+      fontWeight: '900',
+      color: '#111111',
+      letterSpacing: 1,
+    },
+
+    footerText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: '#777777',
+      marginTop: 4,
+    },
+
+    footerSmall: {
+      fontSize: 9,
+      color: '#AAAAAA',
+      marginTop: 8,
+    },
+  });
