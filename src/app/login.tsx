@@ -332,10 +332,20 @@ async function loginAsGuest() {
         '/?guest=true',
       );
 
+      /*
+       * Reset loading state after
+       * navigation has been requested.
+       */
+      setGuestLoading(false);
+
       return;
     }
 
     setGuestLoading(false);
+
+    setMessage(
+      'Guest login-ah harsatna a awm. Tih leh rawh.',
+    );
   } catch (error) {
     console.log(
       'Guest login error:',
