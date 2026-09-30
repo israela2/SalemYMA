@@ -151,8 +151,12 @@ export default function LoginScreen() {
 
   function openAdminSignup() {
     setMessage('');
-
     router.push('/admin-signup');
+  }
+
+  function loginAsGuest() {
+    setMessage('');
+    router.replace('/');
   }
 
   return (
@@ -410,6 +414,40 @@ export default function LoginScreen() {
             >
               <Text style={styles.switchText}>
                 {isRegister ? ' Login' : ' Register'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* =========================
+              GUEST LOGIN
+          ========================= */}
+
+          <View style={styles.guestArea}>
+            <Pressable
+              onPress={loginAsGuest}
+              style={({ pressed }) => [
+                styles.guestButton,
+                pressed && styles.guestButtonPressed,
+              ]}
+            >
+              <View style={styles.guestIconBox}>
+                <Text style={styles.guestIcon}>
+                  👤
+                </Text>
+              </View>
+
+              <View style={styles.guestContent}>
+                <Text style={styles.guestTitle}>
+                  Login as Guest
+                </Text>
+
+                <Text style={styles.guestSubtitle}>
+                  Continue without a member account
+                </Text>
+              </View>
+
+              <Text style={styles.guestArrow}>
+                ›
               </Text>
             </Pressable>
           </View>
@@ -750,6 +788,68 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     color: '#C62828',
+  },
+
+  /* =========================
+      GUEST LOGIN
+  ========================= */
+
+  guestArea: {
+    marginTop: 20,
+  },
+
+  guestButton: {
+    minHeight: 68,
+    borderWidth: 1,
+    borderColor: '#D6D6D6',
+    borderRadius: 14,
+    backgroundColor: '#F8F8F8',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 13,
+  },
+
+  guestButtonPressed: {
+    opacity: 0.75,
+    backgroundColor: '#EEEEEE',
+  },
+
+  guestIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#EEEEEE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
+  guestIcon: {
+    fontSize: 18,
+  },
+
+  guestContent: {
+    flex: 1,
+  },
+
+  guestTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#222222',
+  },
+
+  guestSubtitle: {
+    fontSize: 9,
+    color: '#888888',
+    marginTop: 4,
+    lineHeight: 13,
+  },
+
+  guestArrow: {
+    fontSize: 26,
+    fontWeight: '300',
+    color: '#777777',
+    marginLeft: 8,
   },
 
   /* =========================
