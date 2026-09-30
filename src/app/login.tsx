@@ -1,5 +1,6 @@
 import {
   Image,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -9,11 +10,14 @@ import {
   View,
 } from 'react-native';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
 
 import { supabase } from '../lib/supabase';
+
+const GUEST_KEY = 'salem_yma_guest_mode';
 
 const sections = [
   'Section - I',
@@ -31,7 +35,27 @@ export default function LoginScreen() {
   const [section, setSection] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  async function removeGuestMode() {
+    try {
+      if (
+        Platform.OS === 'web' &&
+        typeof window !== 'undefined' &&
+        typeof window.localStorage !== 'undefined'
+      ) {
+        window.localStorage.removeItem(GUEST_KEY);
+      } else {
+        await AsyncStorage.removeItem(GUEST_KEY);
+      }
+    } catch (error) {
+      console.log(
+        'Guest mode remove error:',
+        error,
+      );
+    }
+  }
 
   async function handleAuth() {
     if (!email.trim() || !password) {
@@ -62,22 +86,31 @@ export default function LoginScreen() {
     setLoading(true);
     setMessage('');
 
-    if (isRegister) {
-      const cleanEmail = email.trim().toLowerCase();
-      const cleanName = fullName.trim();
-      const cleanPhone = phone.trim();
+    // Normal Member Login/Register removes Guest Mode.
+    await removeGuestMode();
 
-      const { data, error } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password,
-        options: {
-          data: {
-            full_name: cleanName,
-            phone: cleanPhone,
-            section,
+    if (isRegister) {
+      const cleanEmail =
+        email.trim().toLowerCase();
+
+      const cleanName =
+        fullName.trim();
+
+      const cleanPhone =
+        phone.trim();
+
+      const { data, error } =
+        await supabase.auth.signUp({
+          email: cleanEmail,
+          password,
+          options: {
+            data: {
+              full_name: cleanName,
+              phone: cleanPhone,
+              section,
+            },
           },
-        },
-      });
+        });
 
       if (error) {
         setLoading(false);
@@ -85,38 +118,43 @@ export default function LoginScreen() {
         return;
       }
 
-      const userId = data.user?.id;
+      const userId =
+        data.user?.id;
 
       if (!userId) {
         setLoading(false);
+
         setMessage(
-          'Account siam zo, mahse user ID lak theih lo.'
+          'Account siam zo, mahse user ID lak theih lo.',
         );
+
         return;
       }
 
-      const { error: memberError } = await supabase
-        .from('members')
-        .insert({
-          user_id: userId,
-          full_name: cleanName,
-          phone: cleanPhone,
-          email: cleanEmail,
-          section: section,
-          branch_name: 'Salem YMA Branch',
-          status: 'Active',
-        });
+      const { error: memberError } =
+        await supabase
+          .from('members')
+          .insert({
+            user_id: userId,
+            full_name: cleanName,
+            phone: cleanPhone,
+            email: cleanEmail,
+            section: section,
+            branch_name:
+              'Salem YMA Branch',
+            status: 'Active',
+          });
 
       setLoading(false);
 
       if (memberError) {
         console.log(
           'Member creation error:',
-          memberError.message
+          memberError.message,
         );
 
         setMessage(
-          'Account siam zo, mahse member information save-ah harsatna a awm.'
+          'Account siam zo, mahse member information save-ah harsatna a awm.',
         );
 
         return;
@@ -128,16 +166,18 @@ export default function LoginScreen() {
       }
 
       setMessage(
-        'Account siam zo. Email verify ngai a nih chuan email check rawh.'
+        'Account siam zo. Email verify ngai a nih chuan email check rawh.',
       );
 
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+    const { error } =
+      await supabase.auth.signInWithPassword({
+        email:
+          email.trim().toLowerCase(),
+        password,
+      });
 
     setLoading(false);
 
@@ -149,20 +189,62 @@ export default function LoginScreen() {
     router.replace('/');
   }
 
-  function openAdminSignup() {
+  // --------------------------------------------------
+  // WEBSITE ONLY — LOGIN AS GUEST
+  // --------------------------------------------------
+
+  async function loginAsGuest() {
+    // This function is intentionally available
+    // only for the Website/Web version.
+    if (Platform.OS !== 'web') {
+      return;
+    }
+
+    if (guestLoading) {
+      return;
+    }
+
+    setGuestLoading(true);
     setMessage('');
-    router.push('/admin-signup');
+
+    try {
+      if (
+        typeof window !== 'undefined' &&
+        typeof window.localStorage !== 'undefined'
+      ) {
+        window.localStorage.setItem(
+          GUEST_KEY,
+          'true',
+        );
+      }
+
+      router.replace('/');
+    } catch (error) {
+      console.log(
+        'Guest login error:',
+        error,
+      );
+
+      setGuestLoading(false);
+
+      setMessage(
+        'Guest login-ah harsatna a awm. Tih leh rawh.',
+      );
+    }
   }
 
-  function loginAsGuest() {
+  function openAdminSignup() {
     setMessage('');
-    router.replace('/');
+
+    router.push('/admin-signup');
   }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          styles.scrollContent
+        }
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -171,7 +253,11 @@ export default function LoginScreen() {
         ========================= */}
 
         <LinearGradient
-          colors={['#D32F2F', '#8E1B1B', '#0B0B0B']}
+          colors={[
+            '#D32F2F',
+            '#8E1B1B',
+            '#0B0B0B',
+          ]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.hero}
@@ -238,7 +324,9 @@ export default function LoginScreen() {
                   placeholder="Enter your full name"
                   placeholderTextColor="#999999"
                   value={fullName}
-                  onChangeText={setFullName}
+                  onChangeText={
+                    setFullName
+                  }
                   autoCapitalize="words"
                 />
               </View>
@@ -267,49 +355,63 @@ export default function LoginScreen() {
                   SECTION
                 </Text>
 
-                <View style={styles.sectionOptions}>
-                  {sections.map((item) => {
-                    const selected = section === item;
+                <View
+                  style={
+                    styles.sectionOptions
+                  }
+                >
+                  {sections.map(
+                    (item) => {
+                      const selected =
+                        section === item;
 
-                    return (
-                      <Pressable
-                        key={item}
-                        onPress={() => {
-                          setSection(item);
-                          setMessage('');
-                        }}
-                        style={[
-                          styles.sectionOption,
-                          selected &&
-                            styles.sectionOptionSelected,
-                        ]}
-                      >
-                        <View
+                      return (
+                        <Pressable
+                          key={item}
+                          onPress={() => {
+                            setSection(
+                              item,
+                            );
+
+                            setMessage(
+                              '',
+                            );
+                          }}
                           style={[
-                            styles.radio,
+                            styles.sectionOption,
                             selected &&
-                              styles.radioSelected,
+                              styles.sectionOptionSelected,
                           ]}
                         >
-                          {selected && (
-                            <View
-                              style={styles.radioInner}
-                            />
-                          )}
-                        </View>
+                          <View
+                            style={[
+                              styles.radio,
+                              selected &&
+                                styles.radioSelected,
+                            ]}
+                          >
+                            {selected && (
+                              <View
+                                style={
+                                  styles.radioInner
+                                }
+                              />
+                            )}
+                          </View>
 
-                        <Text
-                          style={[
-                            styles.sectionOptionText,
-                            selected &&
-                              styles.sectionOptionTextSelected,
-                          ]}
-                        >
-                          {item}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                          <Text
+                            style={[
+                              styles.sectionOptionText,
+                              selected &&
+                                styles.sectionOptionTextSelected,
+                            ]}
+                          >
+                            {item}
+                          </Text>
+                        </Pressable>
+                      );
+                    },
+                  )}
                 </View>
               </View>
             </>
@@ -376,16 +478,25 @@ export default function LoginScreen() {
             disabled={loading}
             style={({ pressed }) => [
               styles.buttonWrap,
-              pressed && styles.buttonPressed,
+              pressed &&
+                styles.buttonPressed,
             ]}
           >
             <LinearGradient
-              colors={['#D32F2F', '#8E1B1B', '#111111']}
+              colors={[
+                '#D32F2F',
+                '#8E1B1B',
+                '#111111',
+              ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.loginButton}
             >
-              <Text style={styles.loginButtonText}>
+              <Text
+                style={
+                  styles.loginButtonText
+                }
+              >
                 {loading
                   ? 'PLEASE WAIT...'
                   : isRegister
@@ -400,7 +511,9 @@ export default function LoginScreen() {
           ========================= */}
 
           <View style={styles.switchArea}>
-            <Text style={styles.switchLabel}>
+            <Text
+              style={styles.switchLabel}
+            >
               {isRegister
                 ? 'Already have an account?'
                 : "Don't have an account?"}
@@ -408,63 +521,152 @@ export default function LoginScreen() {
 
             <Pressable
               onPress={() => {
-                setIsRegister(!isRegister);
+                setIsRegister(
+                  !isRegister,
+                );
+
                 setMessage('');
               }}
             >
-              <Text style={styles.switchText}>
-                {isRegister ? ' Login' : ' Register'}
+              <Text
+                style={styles.switchText}
+              >
+                {isRegister
+                  ? ' Login'
+                  : ' Register'}
               </Text>
             </Pressable>
           </View>
 
           {/* =========================
-              GUEST LOGIN
+              WEBSITE ONLY — GUEST LOGIN
           ========================= */}
 
-          <View style={styles.guestArea}>
-            <Pressable
-              onPress={loginAsGuest}
-              style={({ pressed }) => [
-                styles.guestButton,
-                pressed && styles.guestButtonPressed,
-              ]}
+          {Platform.OS === 'web' && (
+            <View
+              style={
+                styles.guestLoginArea
+              }
             >
-              <View style={styles.guestIconBox}>
-                <Text style={styles.guestIcon}>
-                  👤
+              <View
+                style={
+                  styles.guestDividerRow
+                }
+              >
+                <View
+                  style={
+                    styles.guestDivider
+                  }
+                />
+
+                <Text
+                  style={
+                    styles.guestOrText
+                  }
+                >
+                  WEBSITE
                 </Text>
+
+                <View
+                  style={
+                    styles.guestDivider
+                  }
+                />
               </View>
 
-              <View style={styles.guestContent}>
-                <Text style={styles.guestTitle}>
-                  Login as Guest
-                </Text>
+              <Pressable
+                onPress={loginAsGuest}
+                disabled={guestLoading}
+                style={({
+                  pressed,
+                }) => [
+                  styles.guestLoginButton,
+                  pressed &&
+                    styles.guestLoginPressed,
+                  guestLoading &&
+                    styles.guestLoginDisabled,
+                ]}
+              >
+                <View
+                  style={
+                    styles.guestIconBox
+                  }
+                >
+                  <Text
+                    style={
+                      styles.guestLoginIcon
+                    }
+                  >
+                    👤
+                  </Text>
+                </View>
 
-                <Text style={styles.guestSubtitle}>
-                  Continue without a member account
-                </Text>
-              </View>
+                <View
+                  style={
+                    styles.guestLoginContent
+                  }
+                >
+                  <Text
+                    style={
+                      styles.guestLoginTitle
+                    }
+                  >
+                    {guestLoading
+                      ? 'PLEASE WAIT...'
+                      : 'Login as Guest'}
+                  </Text>
 
-              <Text style={styles.guestArrow}>
-                ›
-              </Text>
-            </Pressable>
-          </View>
+                  <Text
+                    style={
+                      styles.guestLoginSubtitle
+                    }
+                  >
+                    Browse the Salem YMA website
+                  </Text>
+                </View>
+
+                <Text
+                  style={
+                    styles.guestLoginArrow
+                  }
+                >
+                  ›
+                </Text>
+              </Pressable>
+            </View>
+          )}
 
           {/* =========================
               ADMIN SIGN UP
           ========================= */}
 
-          <View style={styles.adminSignupArea}>
-            <View style={styles.adminDividerRow}>
-              <View style={styles.adminDivider} />
+          <View
+            style={
+              styles.adminSignupArea
+            }
+          >
+            <View
+              style={
+                styles.adminDividerRow
+              }
+            >
+              <View
+                style={
+                  styles.adminDivider
+                }
+              />
 
-              <Text style={styles.adminOrText}>
+              <Text
+                style={styles.adminOrText}
+              >
                 ADMIN
               </Text>
 
-              <View style={styles.adminDivider} />
+              <View
+                style={
+                  styles.adminDivider
+                }
+              />
             </View>
 
             <Pressable
@@ -475,23 +677,47 @@ export default function LoginScreen() {
                   styles.adminSignupPressed,
               ]}
             >
-              <View style={styles.adminIconBox}>
-                <Text style={styles.adminSignupIcon}>
+              <View
+                style={
+                  styles.adminIconBox
+                }
+              >
+                <Text
+                  style={
+                    styles.adminSignupIcon
+                  }
+                >
                   🔐
                 </Text>
               </View>
 
-              <View style={styles.adminSignupContent}>
-                <Text style={styles.adminSignupTitle}>
+              <View
+                style={
+                  styles.adminSignupContent
+                }
+              >
+                <Text
+                  style={
+                    styles.adminSignupTitle
+                  }
+                >
                   Admin Sign Up
                 </Text>
 
-                <Text style={styles.adminSignupSubtitle}>
+                <Text
+                  style={
+                    styles.adminSignupSubtitle
+                  }
+                >
                   Request Full Access or Cemetery Admin
                 </Text>
               </View>
 
-              <Text style={styles.adminSignupArrow}>
+              <Text
+                style={
+                  styles.adminSignupArrow
+                }
+              >
                 ›
               </Text>
             </Pressable>
@@ -791,64 +1017,88 @@ const styles = StyleSheet.create({
   },
 
   /* =========================
-      GUEST LOGIN
+      WEBSITE GUEST LOGIN
   ========================= */
 
-  guestArea: {
-    marginTop: 20,
+  guestLoginArea: {
+    marginTop: 25,
   },
 
-  guestButton: {
+  guestDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+
+  guestDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E5E5',
+  },
+
+  guestOrText: {
+    marginHorizontal: 10,
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#999999',
+    letterSpacing: 1.2,
+  },
+
+  guestLoginButton: {
     minHeight: 68,
     borderWidth: 1,
-    borderColor: '#D6D6D6',
+    borderColor: '#E0E0E0',
     borderRadius: 14,
-    backgroundColor: '#F8F8F8',
+    backgroundColor: '#FAFAFA',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 13,
   },
 
-  guestButtonPressed: {
+  guestLoginPressed: {
     opacity: 0.75,
-    backgroundColor: '#EEEEEE',
+    backgroundColor: '#F2F2F2',
+  },
+
+  guestLoginDisabled: {
+    opacity: 0.55,
   },
 
   guestIconBox: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#EEEEEE',
+    backgroundColor: '#FBEAEA',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
 
-  guestIcon: {
+  guestLoginIcon: {
     fontSize: 18,
   },
 
-  guestContent: {
+  guestLoginContent: {
     flex: 1,
   },
 
-  guestTitle: {
+  guestLoginTitle: {
     fontSize: 12,
     fontWeight: '900',
     color: '#222222',
   },
 
-  guestSubtitle: {
+  guestLoginSubtitle: {
     fontSize: 9,
     color: '#888888',
     marginTop: 4,
     lineHeight: 13,
   },
 
-  guestArrow: {
+  guestLoginArrow: {
     fontSize: 26,
     fontWeight: '300',
-    color: '#777777',
+    color: '#C62828',
     marginLeft: 8,
   },
 
