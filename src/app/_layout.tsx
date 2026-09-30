@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { supabase } from '../lib/supabase';
 
 const GUEST_KEY =
   'salem_yma_guest_mode';
@@ -123,16 +124,14 @@ export default function TabLayout() {
   /*
    * WEB ONLY GUEST MODE
    *
-   * Mobile app does not use Guest Mode.
+   * Android/iOS will always keep
+   * isGuest = false.
    */
   const [isGuest, setIsGuest] =
     useState(false);
 
   /*
    * PUBLIC PAGES
-   *
-   * User does not need to be logged in
-   * to open these pages.
    */
   const isPublicPage =
     pathname === '/login' ||
@@ -146,54 +145,116 @@ export default function TabLayout() {
   useEffect(() => {
     let mounted = true;
 
-async function loginAsGuest() {
-  if (Platform.OS !== 'web') {
-    return;
-  }
+    async function checkSession() {
+      try {
+        const {
+          data: { session },
+        } =
+          await supabase.auth.getSession();
 
-  if (guestLoading) {
-    return;
-  }
+        /*
+         * Guest Mode is checked ONLY on Web.
+         */
+        let webGuest = false;
 
-  setGuestLoading(true);
-  setMessage('');
+        if (
+          Platform.OS === 'web' &&
+          typeof window !== 'undefined' &&
+          typeof window.localStorage !==
+            'undefined'
+        ) {
+          webGuest =
+            window.localStorage.getItem(
+              GUEST_KEY,
+            ) === 'true';
+        }
 
-  try {
-    if (
-      typeof window !== 'undefined' &&
-      typeof window.localStorage !== 'undefined'
-    ) {
-      window.localStorage.setItem(
-        GUEST_KEY,
-        'true',
+        if (mounted) {
+          setSession(session);
+          setIsGuest(webGuest);
+        }
+      } catch (error) {
+        console.log(
+          'Session check error:',
+          error,
+        );
+
+        if (mounted) {
+          setSession(null);
+          setIsGuest(false);
+        }
+      } finally {
+        if (mounted) {
+          setCheckingAuth(false);
+        }
+      }
+    }
+
+    checkSession();
+
+    const {
+      data: { subscription },
+    } =
+      supabase.auth.onAuthStateChange(
+        (_event, newSession) => {
+          if (!mounted) {
+            return;
+          }
+
+          setSession(newSession);
+
+          /*
+           * If a real Supabase account
+           * logs in, remove Web Guest Mode.
+           */
+          if (
+            Platform.OS === 'web' &&
+            newSession &&
+            typeof window !== 'undefined' &&
+            typeof window.localStorage !==
+              'undefined'
+          ) {
+            window.localStorage.removeItem(
+              GUEST_KEY,
+            );
+
+            setIsGuest(false);
+          }
+
+          setCheckingAuth(false);
+        },
       );
 
-      /*
-       * Use a full Web navigation here.
-       * This makes _layout.tsx read the saved
-       * Guest Mode flag again from localStorage.
-       *
-       * This code runs ONLY on Web.
-       * Android/iOS cannot reach this block.
-       */
-      window.location.href = '/';
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  /*
+   * AUTH REDIRECT
+   */
+  useEffect(() => {
+    if (checkingAuth) {
       return;
     }
 
-    setGuestLoading(false);
-  } catch (error) {
-    console.log(
-      'Guest login error:',
-      error,
-    );
-
-    setGuestLoading(false);
-
-    setMessage(
-      'Guest login-ah harsatna a awm. Tih leh rawh.',
-    );
-  }
-}
+    /*
+     * No Supabase session and
+     * no Web Guest Mode:
+     *
+     * send user to Login.
+     *
+     * Mobile never has isGuest=true.
+     */
+    if (
+      !session &&
+      !isGuest &&
+      !isPublicPage
+    ) {
+      router.replace('/login');
+      return;
+    }
 
     /*
      * Logged-in member/admin OR
@@ -298,10 +359,6 @@ async function loginAsGuest() {
         },
       }}
     >
-      {/* =========================
-          HOME
-          ========================= */}
-
       <Tabs.Screen
         name="index"
         options={{
@@ -314,10 +371,6 @@ async function loginAsGuest() {
           ),
         }}
       />
-
-      {/* =========================
-          NEWS
-          ========================= */}
 
       <Tabs.Screen
         name="news"
@@ -332,10 +385,6 @@ async function loginAsGuest() {
         }}
       />
 
-      {/* =========================
-          ACTIVITY
-          ========================= */}
-
       <Tabs.Screen
         name="activities"
         options={{
@@ -348,10 +397,6 @@ async function loginAsGuest() {
           ),
         }}
       />
-
-      {/* =========================
-          BRANCH
-          ========================= */}
 
       <Tabs.Screen
         name="branches"
@@ -366,10 +411,6 @@ async function loginAsGuest() {
         }}
       />
 
-      {/* =========================
-          MORE
-          ========================= */}
-
       <Tabs.Screen
         name="more"
         options={{
@@ -381,10 +422,6 @@ async function loginAsGuest() {
           ),
         }}
       />
-
-      {/* =========================
-          HIDDEN PAGES
-          ========================= */}
 
       <Tabs.Screen
         name="zonun"
@@ -449,11 +486,6 @@ async function loginAsGuest() {
         }}
       />
 
-      {/* =========================
-          ABOUT
-          HIDDEN FROM NAVIGATION
-          ========================= */}
-
       <Tabs.Screen
         name="about"
         options={{
@@ -489,20 +521,12 @@ async function loginAsGuest() {
         }}
       />
 
-      {/* =========================
-          LOGIN
-          ========================= */}
-
       <Tabs.Screen
         name="login"
         options={{
           href: null,
         }}
       />
-
-      {/* =========================
-          ADMIN SIGN UP
-          ========================= */}
 
       <Tabs.Screen
         name="admin-signup"
