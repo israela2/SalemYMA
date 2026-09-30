@@ -194,44 +194,49 @@ export default function LoginScreen() {
   // --------------------------------------------------
 
   async function loginAsGuest() {
-    // This function is intentionally available
-    // only for the Website/Web version.
-    if (Platform.OS !== 'web') {
-      return;
-    }
-
-    if (guestLoading) {
-      return;
-    }
-
-    setGuestLoading(true);
-    setMessage('');
-
-    try {
-      if (
-        typeof window !== 'undefined' &&
-        typeof window.localStorage !== 'undefined'
-      ) {
-        window.localStorage.setItem(
-          GUEST_KEY,
-          'true',
-        );
-      }
-
-      router.replace('/');
-    } catch (error) {
-      console.log(
-        'Guest login error:',
-        error,
-      );
-
-      setGuestLoading(false);
-
-      setMessage(
-        'Guest login-ah harsatna a awm. Tih leh rawh.',
-      );
-    }
+  if (Platform.OS !== 'web') {
+    return;
   }
+
+  if (guestLoading) {
+    return;
+  }
+
+  setGuestLoading(true);
+  setMessage('');
+
+  try {
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.localStorage !== 'undefined'
+    ) {
+      window.localStorage.setItem(
+        GUEST_KEY,
+        'true',
+      );
+
+      // Make sure the browser has saved the guest flag
+      // before navigating to the website home page.
+      await new Promise((resolve) =>
+        setTimeout(resolve, 50),
+      );
+    }
+
+    router.replace('/');
+  } catch (error) {
+    console.log(
+      'Guest login error:',
+      error,
+    );
+
+    setGuestLoading(false);
+
+    setMessage(
+      'Guest login-ah harsatna a awm. Tih leh rawh.',
+    );
+  }
+}
+
 
   function openAdminSignup() {
     setMessage('');
