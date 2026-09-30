@@ -1,291 +1,1080 @@
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useCallback, useEffect, useState } from 'react';
 import {
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 
+import { supabase } from '../lib/supabase';
+
+type GalleryItem = {
+  id: string;
+  title: string;
+  album: string;
+  media_type: string;
+  file_url: string;
+  thumbnail_url: string | null;
+  created_at: string;
+};
+
+const albums = [
+  'All',
+  'Activities',
+  'Events',
+  'Members',
+  'Videos',
+];
+
 export default function GalleryScreen() {
-  return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          Gallery
-        </Text>
+  const [items, setItems] = useState<GalleryItem[]>([]);
+  const [selectedAlbum, setSelectedAlbum] = useState('All');
 
-        <Text style={styles.headerText}>
-          Salem YMA photos and memories
-        </Text>
-      </View>
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-      {/* Albums */}
-      <Text style={styles.sectionTitle}>
-        Albums
-      </Text>
+  const [selectedVideo, setSelectedVideo] =
+    useState<GalleryItem | null>(null);
 
-      <View style={styles.row}>
-        <Pressable style={styles.albumCard}>
-          <View style={styles.albumIconBox}>
-            <Text style={styles.albumIcon}>🤝</Text>
-          </View>
+  const [selectedPhoto, setSelectedPhoto] =
+    useState<GalleryItem | null>(null);
 
-          <Text style={styles.albumTitle}>
-            Activities
-          </Text>
+  const loadGallery = useCallback(async () => {
+    setErrorMessage('');
 
-          <Text style={styles.albumText}>
-            YMA hmalakna te
-          </Text>
-        </Pressable>
+    try {
+      /*
+       * OLD GALLERY SYSTEM
+       * Existing photos/videos are stored in gallery_items.
+       */
+      const oldResult = await supabase
+        .from('gallery_items')
+        .select(
+          'id, title, album, media_type, file_url, thumbnail_url, created_at'
+        )
+        .order('created_at', { ascending: false });
 
-        <Pressable
-          style={[
-            styles.albumCard,
-            styles.rightCard,
-          ]}
-        >
-          <View style={styles.albumIconBox}>
-            <Text style={styles.albumIcon}>📅</Text>
-          </View>
+      /*
+       * NEW GALLERY SYSTEM
+       * New admin uploads are stored in gallery.
+       */
+      const newResult = await supabase
+        .from('gallery')
+        .select(
+          'id, title, category, media_type, image_url, created_at'
+        )
+        .order('created_at', { ascending: false });
 
-          <Text style={styles.albumTitle}>
-            Events
-          </Text>
+      if (oldResult.error && newResult.error) {
+        setErrorMessage(
+          oldResult.error.message || newResult.error.message
+        );
+        setItems([]);
+        return;
+      }
 
-          <Text style={styles.albumText}>
-            Programme te
-          </Text>
-        </Pressable>
-      </View>
+      const oldItems: GalleryItem[] = (
+        oldResult.data ?? []
+      ).map((item: any) => ({
+        id: `old-${item.id}`,
+        title: item.title || 'Salem YMA',
+        album: item.album || 'Activities',
+        media_type:
+          item.media_type === 'video'
+            ? 'video'
+            : 'photo',
+        file_url: item.file_url || '',
+        thumbnail_url: item.thumbnail_url || null,
+        created_at: item.created_at,
+      }));
 
-      <View style={styles.row}>
-        <Pressable style={styles.albumCard}>
-          <View style={styles.albumIconBox}>
-            <Text style={styles.albumIcon}>👥</Text>
-          </View>
+      const newItems: GalleryItem[] = (
+        newResult.data ?? []
+      ).map((item: any) => ({
+        id: `new-${item.id}`,
+        title: item.title || 'Salem YMA',
+        album:
+          item.media_type === 'video'
+            ? 'Videos'
+            : item.category || 'Activities',
+        media_type:
+          item.media_type === 'video'
+            ? 'video'
+            : 'photo',
+        file_url: item.image_url || '',
+        thumbnail_url: null,
+        created_at: item.created_at,
+      }));
 
-          <Text style={styles.albumTitle}>
-            Members
-          </Text>
+      /*
+       * Combine both systems.
+       * Newest uploads appear first.
+       */
+      const combined = [
+        ...oldItems,
+        ...newItems,
+      ].sort((a, b) => {
+        return (
+          new Date(b.created_at).getTime() -
+          new Date(a.created_at).getTime()
+        );
+      });
 
-          <Text style={styles.albumText}>
-            Member thlalak te
-          </Text>
-        </Pressable>
+      setItems(combined);
+    } catch (error: any) {
+      setErrorMessage(
+        error?.message || 'Unable to load gallery.'
+      );
+      setItems([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
-        <Pressable
-          style={[
-            styles.albumCard,
-            styles.rightCard,
-          ]}
-        >
-          <View style={styles.albumIconBox}>
-            <Text style={styles.albumIcon}>🎥</Text>
-          </View>
+  useEffect(() => {
+    loadGallery();
+  }, [loadGallery]);
 
-          <Text style={styles.albumTitle}>
-            Videos
-          </Text>
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadGallery();
+  };
 
-          <Text style={styles.albumText}>
-            Video te
-          </Text>
-        </Pressable>
-      </View>
+  const filteredItems =
+    selectedAlbum === 'All'
+      ? items
+      : items.filter(
+          (item) => item.album === selectedAlbum
+        );
 
-      {/* Recent Photos */}
-      <Text style={styles.sectionTitle}>
-        Recent Photos
-      </Text>
-
-      <View style={styles.photoRow}>
-        <View style={styles.photoBox}>
-          <Text style={styles.photoIcon}>📷</Text>
-          <Text style={styles.photoLabel}>
-            Salem YMA
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.photoBox,
-            styles.rightPhoto,
-          ]}
-        >
-          <Text style={styles.photoIcon}>📷</Text>
-          <Text style={styles.photoLabel}>
-            Activity
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.photoRow}>
-        <View style={styles.photoBox}>
-          <Text style={styles.photoIcon}>📷</Text>
-          <Text style={styles.photoLabel}>
-            Programme
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.photoBox,
-            styles.rightPhoto,
-          ]}
-        >
-          <Text style={styles.photoIcon}>📷</Text>
-          <Text style={styles.photoLabel}>
-            Members
-          </Text>
-        </View>
-      </View>
-
-      {/* Information */}
-      <View style={styles.infoCard}>
-        <Text style={styles.infoIcon}>
-          🖼️
-        </Text>
-
-        <View style={styles.infoContent}>
-          <Text style={styles.infoTitle}>
-            Salem YMA Gallery
-          </Text>
-
-          <Text style={styles.infoText}>
-            Salem YMA programme, activity, event leh
-            member-te thlalak te hetah hian kan dah ang.
-          </Text>
-        </View>
-      </View>
-
-      <View style={{ height: 35 }} />
-    </ScrollView>
+  const photoItems = filteredItems.filter(
+    (item) =>
+      item.media_type === 'photo' &&
+      !!item.file_url
   );
+
+  const videoItems = filteredItems.filter(
+    (item) =>
+      item.media_type === 'video' &&
+      !!item.file_url
+  );
+
+  return (
+    <>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#C62828"
+          />
+        }
+      >
+        {/* HEADER */}
+        <LinearGradient
+          colors={['#D32F2F', '#8E1B1B', '#0B0B0B']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Text style={styles.backIcon}>‹</Text>
+          </Pressable>
+
+          <Text style={styles.headerSmall}>
+            YMA SALEM BRANCH
+          </Text>
+
+          <Text style={styles.headerTitle}>
+            Gallery
+          </Text>
+
+          <Text style={styles.headerText}>
+            Salem YMA photos and memories
+          </Text>
+        </LinearGradient>
+
+        {/* SECTION TITLE */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionDot} />
+
+          <View>
+            <Text style={styles.sectionTitle}>
+              Media Collection
+            </Text>
+
+            <Text style={styles.sectionSubtitle}>
+              Salem YMA photos, videos and memories
+            </Text>
+          </View>
+        </View>
+
+        {/* ALBUM FILTERS */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.albumScroll}
+        >
+          {albums.map((album) => {
+            const active = selectedAlbum === album;
+
+            return (
+              <Pressable
+                key={album}
+                onPress={() => setSelectedAlbum(album)}
+                style={[
+                  styles.albumButton,
+                  active
+                    ? styles.albumButtonActive
+                    : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.albumText,
+                    active
+                      ? styles.albumTextActive
+                      : null,
+                  ]}
+                >
+                  {album}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {/* COUNT */}
+        {!loading && !errorMessage ? (
+          <View style={styles.countRow}>
+            <Text style={styles.countText}>
+              {filteredItems.length} media item
+              {filteredItems.length === 1 ? '' : 's'}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* LOADING */}
+        {loading ? (
+          <View style={styles.stateCard}>
+            <ActivityIndicator
+              size="large"
+              color="#C62828"
+            />
+
+            <Text style={styles.stateTitle}>
+              Loading Gallery...
+            </Text>
+
+            <Text style={styles.stateText}>
+              Salem YMA media te kan load mek.
+            </Text>
+          </View>
+        ) : errorMessage ? (
+          <View style={styles.stateCard}>
+            <View style={styles.errorIconBox}>
+              <Text style={styles.errorIcon}>
+                !
+              </Text>
+            </View>
+
+            <Text style={styles.stateTitle}>
+              Gallery load a kal lo
+            </Text>
+
+            <Text style={styles.stateText}>
+              {errorMessage}
+            </Text>
+
+            <Pressable
+              onPress={loadGallery}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryText}>
+                TRY AGAIN
+              </Text>
+            </Pressable>
+          </View>
+        ) : filteredItems.length === 0 ? (
+          <View style={styles.stateCard}>
+            <View style={styles.emptyIconBox}>
+              <Text style={styles.emptyIcon}>
+                🖼️
+              </Text>
+            </View>
+
+            <Text style={styles.stateTitle}>
+              Gallery ruai a awm lo
+            </Text>
+
+            <Text style={styles.stateText}>
+              He album-ah hian media upload tawh a awm lo.
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* PHOTO GRID */}
+            {photoItems.length > 0 ? (
+              <>
+                <View style={styles.mediaSectionHeader}>
+                  <View style={styles.miniRedBar} />
+
+                  <Text style={styles.mediaSectionTitle}>
+                    Photos
+                  </Text>
+                </View>
+
+                <View style={styles.mediaGrid}>
+                  {photoItems.map((item, index) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() =>
+                        setSelectedPhoto(item)
+                      }
+                      style={({ pressed }) => [
+                        styles.mediaCard,
+                        index % 2 === 0
+                          ? styles.mediaCardLeft
+                          : styles.mediaCardRight,
+                        pressed &&
+                          styles.mediaCardPressed,
+                      ]}
+                    >
+                      <Image
+                        source={{
+                          uri:
+                            item.thumbnail_url ||
+                            item.file_url,
+                        }}
+                        style={styles.mediaImage}
+                        resizeMode="cover"
+                      />
+
+                      <View style={styles.mediaOverlay}>
+                        <View style={styles.albumBadge}>
+                          <Text style={styles.albumBadgeText}>
+                            {item.album}
+                          </Text>
+                        </View>
+
+                        <Text
+                          style={styles.mediaTitle}
+                          numberOfLines={2}
+                        >
+                          {item.title}
+                        </Text>
+
+                        <Text style={styles.mediaDate}>
+                          {formatDate(
+                            item.created_at
+                          )}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            ) : null}
+
+            {/* VIDEO SECTION */}
+            {videoItems.length > 0 ? (
+              <View style={styles.videoSection}>
+                <View style={styles.videoHeading}>
+                  <View style={styles.videoHeadingIcon}>
+                    <Text
+                      style={
+                        styles.videoHeadingIconText
+                      }
+                    >
+                      ▶
+                    </Text>
+                  </View>
+
+                  <View>
+                    <Text
+                      style={styles.videoHeadingTitle}
+                    >
+                      Videos
+                    </Text>
+
+                    <Text
+                      style={styles.videoHeadingText}
+                    >
+                      Salem YMA video memories
+                    </Text>
+                  </View>
+                </View>
+
+                {videoItems.map((item) => (
+                  <Pressable
+                    key={item.id}
+                    onPress={() =>
+                      setSelectedVideo(item)
+                    }
+                    style={styles.videoCard}
+                  >
+                    <LinearGradient
+                      colors={[
+                        '#D32F2F',
+                        '#8E1B1B',
+                        '#0B0B0B',
+                      ]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.videoPreview}
+                    >
+                      {item.thumbnail_url ? (
+                        <Image
+                          source={{
+                            uri: item.thumbnail_url,
+                          }}
+                          style={styles.videoThumbnail}
+                          resizeMode="cover"
+                        />
+                      ) : null}
+
+                      <View
+                        style={[
+                          styles.videoDarkOverlay,
+                          item.thumbnail_url
+                            ? styles.videoDarkOverlayWithImage
+                            : null,
+                        ]}
+                      />
+
+                      <View style={styles.playButton}>
+                        <Text style={styles.playIcon}>
+                          ▶
+                        </Text>
+                      </View>
+
+                      <View style={styles.videoTitleBox}>
+                        <Text
+                          style={styles.videoTitle}
+                          numberOfLines={2}
+                        >
+                          {item.title}
+                        </Text>
+                      </View>
+                    </LinearGradient>
+
+                    <View style={styles.videoInfo}>
+                      <Text style={styles.videoType}>
+                        VIDEO
+                      </Text>
+
+                      <Text style={styles.videoDate}>
+                        {formatDate(item.created_at)}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </>
+        )}
+
+        {/* INFO CARD */}
+        <LinearGradient
+          colors={['#D32F2F', '#8E1B1B', '#111111']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.infoCard}
+        >
+          <View style={styles.infoIconBox}>
+            <Text style={styles.infoIcon}>
+              🖼️
+            </Text>
+          </View>
+
+          <View style={styles.infoContent}>
+            <Text style={styles.infoTitle}>
+              Salem YMA Gallery
+            </Text>
+
+            <Text style={styles.infoText}>
+              Salem YMA programme, activity, event leh
+              member-te thlalak te hetah hian kan dah ang.
+            </Text>
+          </View>
+        </LinearGradient>
+
+        <View style={styles.bottomSpace} />
+      </ScrollView>
+
+      {/* PHOTO VIEWER MODAL */}
+      <Modal
+        visible={selectedPhoto !== null}
+        animationType="fade"
+        transparent={false}
+        onRequestClose={() => setSelectedPhoto(null)}
+      >
+        <View style={styles.photoModal}>
+          <View style={styles.photoModalHeader}>
+            <Pressable
+              onPress={() => setSelectedPhoto(null)}
+              style={styles.photoCloseButton}
+            >
+              <Text style={styles.photoCloseText}>
+                ‹
+              </Text>
+            </Pressable>
+
+            <View style={styles.photoModalTitleBox}>
+              <Text
+                style={styles.photoModalTitle}
+                numberOfLines={1}
+              >
+                {selectedPhoto?.title}
+              </Text>
+
+              <Text style={styles.photoModalSubtitle}>
+                {selectedPhoto?.album}
+              </Text>
+            </View>
+          </View>
+
+          {selectedPhoto ? (
+            <View style={styles.photoViewer}>
+              <Image
+                source={{
+                  uri:
+                    selectedPhoto.thumbnail_url ||
+                    selectedPhoto.file_url,
+                }}
+                style={styles.fullPhoto}
+                resizeMode="contain"
+              />
+            </View>
+          ) : null}
+        </View>
+      </Modal>
+
+      {/* VIDEO PLAYER MODAL */}
+      <Modal
+        visible={selectedVideo !== null}
+        animationType="fade"
+        transparent={false}
+        onRequestClose={() => setSelectedVideo(null)}
+      >
+        <View style={styles.videoModal}>
+          <View style={styles.videoModalHeader}>
+            <Pressable
+              onPress={() => setSelectedVideo(null)}
+              style={styles.videoCloseButton}
+            >
+              <Text style={styles.videoCloseText}>
+                ‹
+              </Text>
+            </Pressable>
+
+            <View style={styles.videoModalTitleBox}>
+              <Text
+                style={styles.videoModalTitle}
+                numberOfLines={1}
+              >
+                {selectedVideo?.title}
+              </Text>
+
+              <Text style={styles.videoModalSubtitle}>
+                {selectedVideo?.album}
+              </Text>
+            </View>
+          </View>
+
+          {selectedVideo ? (
+            <GalleryVideoPlayer
+              url={selectedVideo.file_url}
+            />
+          ) : null}
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+function GalleryVideoPlayer({
+  url,
+}: {
+  url: string;
+}) {
+  const player = useVideoPlayer(url, (player) => {
+    player.loop = false;
+    player.play();
+  });
+
+  return (
+    <View style={styles.videoPlayerContainer}>
+      <VideoView
+        player={player}
+        style={styles.videoPlayer}
+        nativeControls
+        contentFit="contain"
+      />
+    </View>
+  );
+}
+
+function formatDate(dateString: string) {
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F6F8',
+    backgroundColor: '#F5F5F5',
   },
 
   header: {
-    backgroundColor: '#123B5D',
-    paddingTop: 55,
-    paddingHorizontal: 18,
-    paddingBottom: 22,
+    paddingTop: 56,
+    paddingHorizontal: 20,
+    paddingBottom: 25,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
+  },
+
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+
+  backIcon: {
+    color: '#FFFFFF',
+    fontSize: 31,
+    lineHeight: 31,
+    marginTop: -3,
+  },
+
+  headerSmall: {
+    color: '#FFB4B4',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginBottom: 5,
   },
 
   headerTitle: {
     color: '#FFFFFF',
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '900',
   },
 
   headerText: {
-    color: '#D8E6F0',
+    color: '#F5DADA',
     fontSize: 12,
     marginTop: 5,
   },
 
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#172033',
-    marginHorizontal: 18,
-    marginTop: 22,
-    marginBottom: 12,
-  },
-
-  row: {
+  sectionHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     marginHorizontal: 18,
-    marginBottom: 10,
+    marginTop: 23,
+    marginBottom: 13,
   },
 
-  albumCard: {
-    flex: 1,
+  sectionDot: {
+    width: 5,
+    height: 27,
+    borderRadius: 3,
+    backgroundColor: '#C62828',
+    marginRight: 10,
+  },
+
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#151515',
+  },
+
+  sectionSubtitle: {
+    fontSize: 10,
+    color: '#888888',
+    marginTop: 2,
+  },
+
+  albumScroll: {
+    paddingHorizontal: 18,
+    paddingBottom: 8,
+  },
+
+  albumButton: {
+    minWidth: 78,
+    height: 38,
+    paddingHorizontal: 15,
+    borderRadius: 19,
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
-  },
-
-  rightCard: {
-    marginLeft: 10,
-  },
-
-  albumIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#E8F0F5',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 8,
   },
 
-  albumIcon: {
-    fontSize: 24,
-  },
-
-  albumTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#172033',
-    marginTop: 10,
+  albumButtonActive: {
+    backgroundColor: '#C62828',
+    borderColor: '#C62828',
   },
 
   albumText: {
     fontSize: 10,
-    color: '#7A8494',
-    marginTop: 4,
+    fontWeight: '800',
+    color: '#777777',
   },
 
-  photoRow: {
-    flexDirection: 'row',
+  albumTextActive: {
+    color: '#FFFFFF',
+  },
+
+  countRow: {
     marginHorizontal: 18,
-    marginBottom: 10,
+    marginTop: 4,
+    marginBottom: 9,
   },
 
-  photoBox: {
-    width: '48%',
-    height: 145,
-    borderRadius: 17,
-    backgroundColor: '#E8F0F5',
+  countText: {
+    fontSize: 10,
+    color: '#888888',
+    fontWeight: '700',
+  },
+
+  stateCard: {
+    marginHorizontal: 18,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
+  },
+
+  stateTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#222222',
+    marginTop: 13,
+    textAlign: 'center',
+  },
+
+  stateText: {
+    fontSize: 11,
+    color: '#777777',
+    marginTop: 6,
+    lineHeight: 17,
+    textAlign: 'center',
+  },
+
+  errorIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FBEAEA',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  rightPhoto: {
-    marginLeft: 10,
+  errorIcon: {
+    fontSize: 25,
+    fontWeight: '900',
+    color: '#C62828',
   },
 
-  photoIcon: {
-    fontSize: 38,
+  emptyIconBox: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: '#FBEAEA',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  photoLabel: {
+  emptyIcon: {
+    fontSize: 28,
+  },
+
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: '#C62828',
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+
+  retryText: {
+    color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: '700',
-    color: '#667085',
-    marginTop: 7,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+
+  mediaSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 18,
+    marginBottom: 10,
+  },
+
+  miniRedBar: {
+    width: 4,
+    height: 18,
+    borderRadius: 2,
+    backgroundColor: '#C62828',
+    marginRight: 8,
+  },
+
+  mediaSectionTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#222222',
+  },
+
+  mediaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: 18,
+  },
+
+  mediaCard: {
+    width: '48%',
+    height: 190,
+    borderRadius: 17,
+    overflow: 'hidden',
+    backgroundColor: '#E9E9E9',
+    marginBottom: 10,
+  },
+
+  mediaCardLeft: {
+    marginRight: '4%',
+  },
+
+  mediaCardRight: {
+    marginRight: 0,
+  },
+
+  mediaCardPressed: {
+    opacity: 0.78,
+    transform: [
+      {
+        scale: 0.98,
+      },
+    ],
+  },
+
+  mediaImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  mediaOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 10,
+    paddingTop: 28,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+  },
+
+  albumBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#C62828',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 5,
+  },
+
+  albumBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 7,
+    fontWeight: '900',
+  },
+
+  mediaTitle: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+
+  mediaDate: {
+    color: '#DDDDDD',
+    fontSize: 8,
+    marginTop: 5,
+  },
+
+  videoSection: {
+    marginTop: 9,
+  },
+
+  videoHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 18,
+    marginBottom: 10,
+  },
+
+  videoHeadingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    backgroundColor: '#FBEAEA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+
+  videoHeadingIconText: {
+    color: '#C62828',
+    fontSize: 16,
+  },
+
+  videoHeadingTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#222222',
+  },
+
+  videoHeadingText: {
+    fontSize: 10,
+    color: '#888888',
+    marginTop: 2,
+  },
+
+  videoCard: {
+    marginHorizontal: 18,
+    marginBottom: 12,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
+  },
+
+  videoPreview: {
+    height: 165,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+
+  videoThumbnail: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+
+  videoDarkOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+
+  videoDarkOverlayWithImage: {
+    backgroundColor: 'rgba(0,0,0,0.38)',
+  },
+
+  playButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  playIcon: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    marginLeft: 3,
+  },
+
+  videoTitleBox: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    bottom: 13,
+  },
+
+  videoTitle: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+
+  videoInfo: {
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+
+  videoType: {
+    color: '#C62828',
+    fontSize: 9,
+    fontWeight: '900',
+  },
+
+  videoDate: {
+    color: '#888888',
+    fontSize: 9,
   },
 
   infoCard: {
     marginHorizontal: 18,
-    marginTop: 8,
+    marginTop: 13,
     padding: 16,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    borderRadius: 19,
     flexDirection: 'row',
   },
 
+  infoIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.13)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   infoIcon: {
-    fontSize: 23,
+    fontSize: 21,
   },
 
   infoContent: {
@@ -295,14 +1084,138 @@ const styles = StyleSheet.create({
 
   infoTitle: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#172033',
+    fontWeight: '900',
+    color: '#FFFFFF',
   },
 
   infoText: {
     fontSize: 11,
-    color: '#6B7280',
+    color: '#F2DADA',
     marginTop: 5,
     lineHeight: 17,
+  },
+
+  bottomSpace: {
+    height: 35,
+  },
+
+  photoModal: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+
+  photoModalHeader: {
+    height: 85,
+    paddingTop: 15,
+    paddingHorizontal: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222222',
+  },
+
+  photoCloseButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#1E1E1E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  photoCloseText: {
+    color: '#FFFFFF',
+    fontSize: 31,
+    lineHeight: 31,
+    marginTop: -3,
+  },
+
+  photoModalTitleBox: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  photoModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+
+  photoModalSubtitle: {
+    color: '#999999',
+    fontSize: 10,
+    marginTop: 4,
+  },
+
+  photoViewer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+  },
+
+  fullPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+
+  videoModal: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+
+  videoModalHeader: {
+    height: 85,
+    paddingTop: 15,
+    paddingHorizontal: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222222',
+  },
+
+  videoCloseButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#1E1E1E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  videoCloseText: {
+    color: '#FFFFFF',
+    fontSize: 31,
+    lineHeight: 31,
+    marginTop: -3,
+  },
+
+  videoModalTitleBox: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  videoModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+
+  videoModalSubtitle: {
+    color: '#999999',
+    fontSize: 10,
+    marginTop: 4,
+  },
+
+  videoPlayerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+  },
+
+  videoPlayer: {
+    width: '100%',
+    height: 320,
   },
 });

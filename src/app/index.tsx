@@ -1,490 +1,1107 @@
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 
 export default function HomeScreen() {
+  const { width } = useWindowDimensions();
+
+  const isWebDesktop = width >= 900;
+
   return (
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>SY</Text>
-        </View>
+      {/* HEADER */}
+      <LinearGradient
+        colors={['#D32F2F', '#8E1B1B', '#0B0B0B']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[
+          styles.header,
+          isWebDesktop && styles.desktopHeader,
+        ]}
+      >
+        <View style={styles.headerTop}>
 
-        <View style={styles.headerInfo}>
-          <Text style={styles.orgName}>
-            Salem YMA
-          </Text>
+          {/* BRAND */}
+          <View style={styles.brandArea}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../../assets/images/yma-logo.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </View>
 
-          <Text style={styles.orgSubtitle}>
-            Young Mizo Association
-          </Text>
-        </View>
+            <View style={styles.brandText}>
+              <Text style={styles.orgName}>
+                YMA Salem Branch
+              </Text>
 
-        <Pressable
-          style={styles.notificationButton}
-          onPress={() => router.push('/notifications')}
-        >
-          <Text style={styles.notificationIcon}>
-            🔔
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Welcome */}
-      <View style={styles.welcomeCard}>
-        <Text style={styles.welcomeSmall}>
-          WELCOME TO
-        </Text>
-
-        <Text style={styles.welcomeTitle}>
-          Salem YMA
-        </Text>
-
-        <Text style={styles.welcomeText}>
-          Community, service, unity and fellowship.
-        </Text>
-      </View>
-
-      {/* Quick Access */}
-      <Text style={styles.sectionTitle}>
-        Quick Access
-      </Text>
-
-      <View style={styles.quickRow}>
-        <Pressable
-          style={styles.quickCard}
-          onPress={() => router.push('/news')}
-        >
-          <View style={styles.quickIconBox}>
-            <Text style={styles.quickIcon}>📰</Text>
+              <Text style={styles.orgSubtitle}>
+                Young Mizo Association
+              </Text>
+            </View>
           </View>
 
-          <Text style={styles.quickTitle}>
-            News
+          {/* DESKTOP NAVIGATION */}
+          {isWebDesktop && (
+            <View style={styles.desktopNav}>
+
+              <Pressable
+                style={styles.navItemActive}
+                onPress={() => router.push('/')}
+              >
+                <Text style={styles.navTextActive}>
+                  Home
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.navItem}
+                onPress={() => router.push('/zonun')}
+              >
+                <Text style={styles.navText}>
+                  Zonun
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.navItem}
+                onPress={() => router.push('/news')}
+              >
+                <Text style={styles.navText}>
+                  News
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.navItem}
+                onPress={() => router.push('/events')}
+              >
+                <Text style={styles.navText}>
+                  Events
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.navItem}
+                onPress={() => router.push('/gallery')}
+              >
+                <Text style={styles.navText}>
+                  Gallery
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.navItem}
+                onPress={() => router.push('/activities')}
+              >
+                <Text style={styles.navText}>
+                  Activities
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.navLogin}
+                onPress={() => router.push('/login')}
+              >
+                <Text style={styles.navLoginText}>
+                  Login
+                </Text>
+              </Pressable>
+
+            </View>
+          )}
+
+          {/* NOTIFICATION */}
+          <Pressable
+            style={styles.notificationButton}
+            onPress={() => router.push('/notifications')}
+          >
+            <Text style={styles.notificationIcon}>
+              🔔
+            </Text>
+
+            <View style={styles.notificationDot} />
+          </Pressable>
+
+        </View>
+
+        {/* WELCOME */}
+        <View style={styles.headerWelcome}>
+          <Text style={styles.headerWelcomeSmall}>
+            HELLO, WELCOME
           </Text>
 
-          <Text style={styles.quickText}>
-            Latest updates
+          <Text style={styles.headerWelcomeTitle}>
+            YMA thil tum
           </Text>
-        </Pressable>
 
-        <Pressable
-          style={styles.quickCard}
-          onPress={() => router.push('/events')}
+          <Text style={styles.headerWelcomeText}>
+            Hun âwl hman ṭhat • Zo fâte hma-sâwnna ngaihtuah • Kristian nun dan ṭha ngaihsan
+          </Text>
+        </View>
+      </LinearGradient>
+
+      {/* MAIN CONTENT */}
+      <View
+        style={[
+          styles.content,
+          isWebDesktop && styles.desktopContent,
+        ]}
+      >
+
+        {/* FEATURE CARDS */}
+        <View
+          style={
+            isWebDesktop
+              ? styles.desktopFeatureGrid
+              : undefined
+          }
         >
-          <View style={styles.quickIconBox}>
-            <Text style={styles.quickIcon}>📅</Text>
+
+          {/* WASTE FEE */}
+          <Pressable
+            style={[
+              styles.featureCard,
+              isWebDesktop && styles.desktopCard,
+            ]}
+            onPress={() => router.push('/waste-fee')}
+          >
+            <LinearGradient
+              colors={['#D32F2F', '#8E1B1B', '#0B0B0B']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.featureGradient}
+            >
+              <View style={styles.featureTop}>
+                <View style={styles.featureIcon}>
+                  <Text style={styles.featureIconText}>
+                    🗑️
+                  </Text>
+                </View>
+
+                <View style={styles.featureBadge}>
+                  <Text style={styles.featureBadgeText}>
+                    QUICK SERVICE
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.featureTitle}>
+                Bawhhlawh Paih Man
+              </Text>
+
+              <Text style={styles.featureDescription}>
+                Check your waste collection fee and manage
+                your payment easily.
+              </Text>
+
+              <View style={styles.featureBottom}>
+                <Text style={styles.featureAction}>
+                  Open Service
+                </Text>
+
+                <Text style={styles.featureArrow}>
+                  →
+                </Text>
+              </View>
+            </LinearGradient>
+          </Pressable>
+
+          {/* ZONUN */}
+          <Pressable
+            style={[
+              styles.gasCard,
+              isWebDesktop && styles.desktopCard,
+            ]}
+            onPress={() => router.push('/zonun')}
+          >
+            <LinearGradient
+              colors={['#111111', '#8E1B1B', '#C62828']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.gasGradient}
+            >
+              <View style={styles.gasTop}>
+
+                <View style={styles.gasIcon}>
+                  <Text style={styles.gasIconText}>
+                    📖
+                  </Text>
+                </View>
+
+                <View style={styles.gasBadge}>
+                  <Text style={styles.gasBadgeText}>
+                    YMA DOCUMENT
+                  </Text>
+                </View>
+
+              </View>
+
+              <Text style={styles.gasTitle}>
+                Zonun
+              </Text>
+
+              <Text style={styles.gasDescription}>
+                Salem YMA Zonun leh thuthlung te PDF hmangin chhiar rawh.
+              </Text>
+
+              <View style={styles.gasBottom}>
+
+                <Text style={styles.gasAction}>
+                  Open Zonun
+                </Text>
+
+                <Text style={styles.gasArrow}>
+                  →
+                </Text>
+
+              </View>
+            </LinearGradient>
+          </Pressable>
+
+          {/* GAS BOOKING */}
+          <Pressable
+            style={[
+              styles.gasCard,
+              isWebDesktop && styles.desktopCard,
+            ]}
+            onPress={() => router.push('/gas-booking')}
+          >
+            <LinearGradient
+              colors={['#111111', '#8E1B1B', '#C62828']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.gasGradient}
+            >
+              <View style={styles.gasTop}>
+
+                <View style={styles.gasIcon}>
+                  <Text style={styles.gasIconText}>
+                    🔥
+                  </Text>
+                </View>
+
+                <View style={styles.gasBadge}>
+                  <Text style={styles.gasBadgeText}>
+                    QUICK SERVICE
+                  </Text>
+                </View>
+
+              </View>
+
+              <Text style={styles.gasTitle}>
+                Gas Booking
+              </Text>
+
+              <Text style={styles.gasDescription}>
+                Book your LPG gas cylinder easily through Salem YMA.
+              </Text>
+
+              <View style={styles.gasBottom}>
+
+                <Text style={styles.gasAction}>
+                  Book Gas
+                </Text>
+
+                <Text style={styles.gasArrow}>
+                  →
+                </Text>
+
+              </View>
+            </LinearGradient>
+          </Pressable>
+
+        </View>
+
+        {/* QUICK ACCESS */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            Quick Access
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.quickGrid,
+            isWebDesktop && styles.desktopQuickGrid,
+          ]}
+        >
+
+          {/* NEWS */}
+          <Pressable
+            style={[
+              styles.quickCard,
+              isWebDesktop && styles.desktopQuickCard,
+            ]}
+            onPress={() => router.push('/news')}
+          >
+            <View style={[styles.quickIcon, styles.redIcon]}>
+              <Text style={styles.quickIconText}>
+                📰
+              </Text>
+            </View>
+
+            <Text style={styles.quickTitle}>
+              News
+            </Text>
+
+            <Text style={styles.quickSubtitle}>
+              Latest updates
+            </Text>
+          </Pressable>
+
+          {/* EVENTS */}
+          <Pressable
+            style={[
+              styles.quickCard,
+              isWebDesktop && styles.desktopQuickCard,
+            ]}
+            onPress={() => router.push('/events')}
+          >
+            <View style={[styles.quickIcon, styles.darkIcon]}>
+              <Text style={styles.quickIconText}>
+                📅
+              </Text>
+            </View>
+
+            <Text style={styles.quickTitle}>
+              Events
+            </Text>
+
+            <Text style={styles.quickSubtitle}>
+              Upcoming events
+            </Text>
+          </Pressable>
+
+          {/* GALLERY */}
+          <Pressable
+            style={[
+              styles.quickCard,
+              isWebDesktop && styles.desktopQuickCard,
+            ]}
+            onPress={() => router.push('/gallery')}
+          >
+            <View style={[styles.quickIcon, styles.grayIcon]}>
+              <Text style={styles.quickIconText}>
+                🖼️
+              </Text>
+            </View>
+
+            <Text style={styles.quickTitle}>
+              Gallery
+            </Text>
+
+            <Text style={styles.quickSubtitle}>
+              Photos & memories
+            </Text>
+          </Pressable>
+
+          {/* ACTIVITIES */}
+          <Pressable
+            style={[
+              styles.quickCard,
+              isWebDesktop && styles.desktopQuickCard,
+            ]}
+            onPress={() => router.push('/activities')}
+          >
+            <View style={[styles.quickIcon, styles.blackIcon]}>
+              <Text style={styles.quickIconText}>
+                🤝
+              </Text>
+            </View>
+
+            <Text style={styles.quickTitle}>
+              Activities
+            </Text>
+
+            <Text style={styles.quickSubtitle}>
+              YMA activities
+            </Text>
+          </Pressable>
+
+        </View>
+
+        {/* NEWS + EVENT DESKTOP ROW */}
+        <View
+          style={
+            isWebDesktop
+              ? styles.desktopTwoColumn
+              : undefined
+          }
+        >
+
+          {/* LATEST NEWS */}
+          <View
+            style={
+              isWebDesktop
+                ? styles.desktopColumn
+                : undefined
+            }
+          >
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                Latest News
+              </Text>
+
+              <Pressable
+                onPress={() => router.push('/news')}
+              >
+                <Text style={styles.viewAll}>
+                  View All
+                </Text>
+              </Pressable>
+            </View>
+
+            <Pressable
+              style={styles.newsCard}
+              onPress={() => router.push('/news')}
+            >
+              <LinearGradient
+                colors={['#D32F2F', '#111111']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.newsDate}
+              >
+                <Text style={styles.newsMonth}>
+                  SEP
+                </Text>
+
+                <Text style={styles.newsDay}>
+                  26
+                </Text>
+              </LinearGradient>
+
+              <View style={styles.newsContent}>
+                <View style={styles.newsBadge}>
+                  <Text style={styles.newsBadgeText}>
+                    ANNOUNCEMENT
+                  </Text>
+                </View>
+
+                <Text style={styles.newsTitle}>
+                  Salem YMA Important Announcement
+                </Text>
+
+                <Text
+                  style={styles.newsDescription}
+                  numberOfLines={2}
+                >
+                  Important announcements and information
+                  from Salem YMA will be shared here.
+                </Text>
+              </View>
+
+              <Text style={styles.cardArrow}>
+                ›
+              </Text>
+            </Pressable>
           </View>
 
-          <Text style={styles.quickTitle}>
-            Events
-          </Text>
+          {/* UPCOMING EVENT */}
+          <View
+            style={
+              isWebDesktop
+                ? styles.desktopColumn
+                : undefined
+            }
+          >
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                Upcoming Event
+              </Text>
 
-          <Text style={styles.quickText}>
-            Upcoming events
-          </Text>
-        </Pressable>
+              <Pressable
+                onPress={() => router.push('/events')}
+              >
+                <Text style={styles.viewAll}>
+                  View All
+                </Text>
+              </Pressable>
+            </View>
 
-        <Pressable
-          style={styles.quickCard}
-          onPress={() => router.push('/gallery')}
-        >
-          <View style={styles.quickIconBox}>
-            <Text style={styles.quickIcon}>🖼️</Text>
+            <Pressable
+              style={styles.eventCard}
+              onPress={() => router.push('/events')}
+            >
+              <LinearGradient
+                colors={['#D32F2F', '#111111']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.eventDateBox}
+              >
+                <Text style={styles.eventMonth}>
+                  SEP
+                </Text>
+
+                <Text style={styles.eventDay}>
+                  28
+                </Text>
+              </LinearGradient>
+
+              <View style={styles.eventContent}>
+                <Text style={styles.eventTitle}>
+                  Salem YMA Programme
+                </Text>
+
+                <Text style={styles.eventInfo}>
+                  📍 Salem, Mizoram
+                </Text>
+
+                <Text style={styles.eventInfo}>
+                  🕒 Upcoming programme
+                </Text>
+              </View>
+
+              <Text style={styles.cardArrow}>
+                ›
+              </Text>
+            </Pressable>
           </View>
 
-          <Text style={styles.quickTitle}>
-            Gallery
-          </Text>
-
-          <Text style={styles.quickText}>
-            Photos
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Waste Fee */}
-      <Text style={styles.sectionTitle}>
-        Services
-      </Text>
-
-      <Pressable
-        style={styles.serviceCard}
-        onPress={() => router.push('/waste-fee')}
-      >
-        <View style={styles.serviceIconBox}>
-          <Text style={styles.serviceIcon}>
-            🗑️
-          </Text>
         </View>
 
-        <View style={styles.serviceContent}>
-          <Text style={styles.serviceTitle}>
-            Bawhhlawh Paih Man
-          </Text>
-
-          <Text style={styles.serviceText}>
-            Waste collection fee & payment
-          </Text>
-        </View>
-
-        <Text style={styles.arrow}>
-          ›
-        </Text>
-      </Pressable>
-
-      {/* Latest News */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitleNoMargin}>
-          Latest News
-        </Text>
-
-        <Pressable
-          onPress={() => router.push('/news')}
+        {/* COMMUNITY MESSAGE */}
+        <LinearGradient
+          colors={['#D32F2F', '#0B0B0B']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.messageCard}
         >
-          <Text style={styles.viewAll}>
-            View All
-          </Text>
-        </Pressable>
+          <View style={styles.messageIcon}>
+            <Text style={styles.messageIconText}>
+              ♥
+            </Text>
+          </View>
+
+          <View style={styles.messageContent}>
+            <Text style={styles.messageTitle}>
+              Together as a community
+            </Text>
+
+            <Text style={styles.messageText}>
+              Stay connected with Salem YMA through
+              news, activities, programmes and updates.
+            </Text>
+          </View>
+        </LinearGradient>
+
+        <View style={styles.bottomSpace} />
+
       </View>
-
-      <Pressable
-        style={styles.newsCard}
-        onPress={() => router.push('/news')}
-      >
-        <View style={styles.newsDate}>
-          <Text style={styles.newsMonth}>
-            SEP
-          </Text>
-
-          <Text style={styles.newsDay}>
-            26
-          </Text>
-        </View>
-
-        <View style={styles.newsContent}>
-          <Text style={styles.newsBadge}>
-            ANNOUNCEMENT
-          </Text>
-
-          <Text style={styles.newsTitle}>
-            Salem YMA Important Announcement
-          </Text>
-
-          <Text style={styles.newsText}>
-            Important announcements and information
-            will be shared here.
-          </Text>
-        </View>
-      </Pressable>
-
-      {/* Upcoming Event */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitleNoMargin}>
-          Upcoming Event
-        </Text>
-
-        <Pressable
-          onPress={() => router.push('/events')}
-        >
-          <Text style={styles.viewAll}>
-            View All
-          </Text>
-        </Pressable>
-      </View>
-
-      <Pressable
-        style={styles.eventCard}
-        onPress={() => router.push('/events')}
-      >
-        <View style={styles.eventIconBox}>
-          <Text style={styles.eventIcon}>
-            📅
-          </Text>
-        </View>
-
-        <View style={styles.eventContent}>
-          <Text style={styles.eventTitle}>
-            Salem YMA Programme
-          </Text>
-
-          <Text style={styles.eventDate}>
-            28 September 2026
-          </Text>
-
-          <Text style={styles.eventLocation}>
-            📍 Salem, Mizoram
-          </Text>
-        </View>
-
-        <Text style={styles.arrow}>
-          ›
-        </Text>
-      </Pressable>
-
-      {/* Notice */}
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeIcon}>
-          ℹ️
-        </Text>
-
-        <View style={styles.noticeContent}>
-          <Text style={styles.noticeTitle}>
-            Stay Updated
-          </Text>
-
-          <Text style={styles.noticeText}>
-            Salem YMA announcements, activities,
-            programmes and important notices will
-            appear in this app.
-          </Text>
-        </View>
-      </View>
-
-      <View style={{ height: 35 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+
+  /* MAIN */
+
   container: {
     flex: 1,
-    backgroundColor: '#F4F6F8',
+    backgroundColor: '#F5F5F5',
   },
+
+  /* HEADER */
 
   header: {
-    backgroundColor: '#123B5D',
     paddingTop: 55,
-    paddingHorizontal: 18,
-    paddingBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    overflow: 'hidden',
   },
 
-  logoCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+  desktopHeader: {
+    paddingTop: 28,
+    paddingHorizontal: 40,
+    paddingBottom: 35,
+  },
+
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  brandArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+
+  logoContainer: {
+    width: 57,
+    height: 57,
+    borderRadius: 18,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
 
-  logoText: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: '#123B5D',
+  logoImage: {
+    width: 48,
+    height: 48,
   },
 
-  headerInfo: {
-    flex: 1,
+  brandText: {
     marginLeft: 12,
   },
 
   orgName: {
     color: '#FFFFFF',
-    fontSize: 23,
+    fontSize: 22,
     fontWeight: '900',
   },
 
   orgSubtitle: {
-    color: '#D8E6F0',
-    fontSize: 11,
-    marginTop: 2,
+    color: '#F1F1F1',
+    fontSize: 10,
+    marginTop: 3,
   },
 
+  /* DESKTOP NAV */
+
+  desktopNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    marginHorizontal: 25,
+  },
+
+  navItem: {
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: 10,
+    marginHorizontal: 2,
+  },
+
+  navItemActive: {
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF22',
+    marginHorizontal: 2,
+  },
+
+  navText: {
+    color: '#EEEEEE',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  navTextActive: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+
+  navLogin: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 17,
+    paddingVertical: 9,
+    borderRadius: 10,
+    marginLeft: 7,
+  },
+
+  navLoginText: {
+    color: '#8E1B1B',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+
+  /* NOTIFICATION */
+
   notificationButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 15,
     backgroundColor: '#FFFFFF22',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   notificationIcon: {
-    fontSize: 20,
-  },
-
-  welcomeCard: {
-    margin: 18,
-    padding: 22,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-  },
-
-  welcomeSmall: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#7A8494',
-    letterSpacing: 1.2,
-  },
-
-  welcomeTitle: {
-    fontSize: 29,
-    fontWeight: '900',
-    color: '#123B5D',
-    marginTop: 5,
-  },
-
-  welcomeText: {
-    fontSize: 13,
-    color: '#667085',
-    marginTop: 6,
-  },
-
-  sectionTitle: {
     fontSize: 19,
-    fontWeight: '800',
-    color: '#172033',
-    marginHorizontal: 18,
-    marginTop: 5,
-    marginBottom: 12,
   },
 
-  quickRow: {
-    flexDirection: 'row',
-    marginHorizontal: 18,
+  notificationDot: {
+    position: 'absolute',
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#FF5252',
+    top: 9,
+    right: 10,
   },
 
-  quickCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 13,
-    alignItems: 'center',
-    marginRight: 8,
+  /* WELCOME */
+
+  headerWelcome: {
+    marginTop: 28,
   },
 
-  quickIconBox: {
-    width: 43,
-    height: 43,
-    borderRadius: 13,
-    backgroundColor: '#E8F0F5',
-    alignItems: 'center',
-    justifyContent: 'center',
+  headerWelcomeSmall: {
+    color: '#F3CACA',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.5,
   },
 
-  quickIcon: {
-    fontSize: 21,
-  },
-
-  quickTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#172033',
-    marginTop: 7,
-  },
-
-  quickText: {
-    fontSize: 8,
-    color: '#7A8494',
-    marginTop: 3,
-    textAlign: 'center',
-  },
-
-  serviceCard: {
-    marginHorizontal: 18,
-    padding: 16,
-    borderRadius: 17,
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  serviceIconBox: {
-    width: 50,
-    height: 50,
-    borderRadius: 14,
-    backgroundColor: '#E8F0F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  serviceIcon: {
-    fontSize: 25,
-  },
-
-  serviceContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-
-  serviceTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#172033',
-  },
-
-  serviceText: {
-    fontSize: 10,
-    color: '#7A8494',
+  headerWelcomeTitle: {
+    color: '#FFFFFF',
+    fontSize: 30,
+    fontWeight: '900',
     marginTop: 4,
   },
 
-  arrow: {
-    fontSize: 27,
-    color: '#98A2B3',
+  headerWelcomeText: {
+    color: '#E8E8E8',
+    fontSize: 11,
+    marginTop: 5,
   },
 
+  /* CONTENT */
+
+  content: {
+    paddingHorizontal: 18,
+    paddingTop: 18,
+  },
+
+  desktopContent: {
+    width: '100%',
+    maxWidth: 1200,
+    alignSelf: 'center',
+    paddingHorizontal: 30,
+    paddingTop: 25,
+  },
+
+  /* FEATURE GRID */
+
+  desktopFeatureGrid: {
+    flexDirection: 'row',
+    width: '100%',
+  },
+
+  desktopCard: {
+    flex: 1,
+    marginTop: 0,
+    marginHorizontal: 6,
+  },
+
+  /* WASTE FEE */
+
+  featureCard: {
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+
+  featureGradient: {
+    padding: 19,
+    minHeight: 190,
+  },
+
+  featureTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  featureIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    backgroundColor: '#FFFFFF22',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  featureIconText: {
+    fontSize: 23,
+  },
+
+  featureBadge: {
+    backgroundColor: '#FFFFFF20',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 7,
+  },
+
+  featureBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+
+  featureTitle: {
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: '900',
+    marginTop: 15,
+  },
+
+  featureDescription: {
+    color: '#F0F0F0',
+    fontSize: 11,
+    lineHeight: 17,
+    marginTop: 5,
+  },
+
+  featureBottom: {
+    marginTop: 17,
+    paddingTop: 13,
+    borderTopWidth: 1,
+    borderTopColor: '#FFFFFF35',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  featureAction: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+
+  featureArrow: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+
+  /* ZONUN / GAS */
+
+  gasCard: {
+    borderRadius: 22,
+    overflow: 'hidden',
+    marginTop: 12,
+  },
+
+  gasGradient: {
+    padding: 19,
+    minHeight: 190,
+  },
+
+  gasTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  gasIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    backgroundColor: '#FFFFFF20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  gasIconText: {
+    fontSize: 23,
+  },
+
+  gasBadge: {
+    backgroundColor: '#FFFFFF20',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 7,
+  },
+
+  gasBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+
+  gasTitle: {
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: '900',
+    marginTop: 15,
+  },
+
+  gasDescription: {
+    color: '#F0F0F0',
+    fontSize: 11,
+    lineHeight: 17,
+    marginTop: 5,
+  },
+
+  gasBottom: {
+    marginTop: 17,
+    paddingTop: 13,
+    borderTopWidth: 1,
+    borderTopColor: '#FFFFFF35',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  gasAction: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+
+  gasArrow: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+
+  /* SECTION */
+
   sectionHeader: {
-    marginHorizontal: 18,
-    marginTop: 24,
+    marginTop: 25,
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
 
-  sectionTitleNoMargin: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#172033',
+  sectionTitle: {
+    color: '#111111',
+    fontSize: 18,
+    fontWeight: '900',
   },
 
   viewAll: {
+    color: '#C62828',
     fontSize: 10,
-    fontWeight: '800',
-    color: '#123B5D',
+    fontWeight: '900',
   },
 
-  newsCard: {
-    marginHorizontal: 18,
-    padding: 15,
-    borderRadius: 17,
-    backgroundColor: '#FFFFFF',
+  /* QUICK ACCESS */
+
+  quickGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
 
-  newsDate: {
-    width: 54,
-    height: 61,
-    borderRadius: 13,
-    backgroundColor: '#E8F0F5',
+  desktopQuickGrid: {
+    flexWrap: 'nowrap',
+    justifyContent: 'space-between',
+  },
+
+  quickCard: {
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 15,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+
+  desktopQuickCard: {
+    width: '24%',
+    marginHorizontal: 2,
+  },
+
+  quickIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
+  redIcon: {
+    backgroundColor: '#FBEAEA',
+  },
+
+  darkIcon: {
+    backgroundColor: '#EEEEEE',
+  },
+
+  grayIcon: {
+    backgroundColor: '#F1F1F1',
+  },
+
+  blackIcon: {
+    backgroundColor: '#E8E8E8',
+  },
+
+  quickIconText: {
+    fontSize: 20,
+  },
+
+  quickTitle: {
+    color: '#111111',
+    fontSize: 13,
+    fontWeight: '900',
+    marginTop: 10,
+  },
+
+  quickSubtitle: {
+    color: '#777777',
+    fontSize: 9,
+    marginTop: 3,
+  },
+
+  /* TWO COLUMN */
+
+  desktopTwoColumn: {
+    flexDirection: 'row',
+    width: '100%',
+  },
+
+  desktopColumn: {
+    flex: 1,
+    marginHorizontal: 6,
+  },
+
+  /* NEWS */
+
+  newsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+
+  newsDate: {
+    width: 55,
+    height: 63,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+
   newsMonth: {
+    color: '#FFFFFF',
     fontSize: 9,
     fontWeight: '900',
-    color: '#123B5D',
   },
 
   newsDay: {
-    fontSize: 21,
+    color: '#FFFFFF',
+    fontSize: 22,
     fontWeight: '900',
-    color: '#123B5D',
+    marginTop: 1,
   },
 
   newsContent: {
@@ -494,49 +1111,64 @@ const styles = StyleSheet.create({
 
   newsBadge: {
     alignSelf: 'flex-start',
-    fontSize: 8,
-    fontWeight: '900',
-    color: '#123B5D',
-    backgroundColor: '#E8F0F5',
+    backgroundColor: '#FBEAEA',
     paddingHorizontal: 7,
     paddingVertical: 4,
     borderRadius: 5,
   },
 
-  newsTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#172033',
-    marginTop: 7,
+  newsBadgeText: {
+    color: '#C62828',
+    fontSize: 7,
+    fontWeight: '900',
   },
 
-  newsText: {
-    fontSize: 10,
-    color: '#7A8494',
-    lineHeight: 15,
-    marginTop: 4,
+  newsTitle: {
+    color: '#111111',
+    fontSize: 13,
+    fontWeight: '900',
+    marginTop: 6,
   },
+
+  newsDescription: {
+    color: '#777777',
+    fontSize: 9,
+    lineHeight: 14,
+    marginTop: 3,
+  },
+
+  /* EVENT */
 
   eventCard: {
-    marginHorizontal: 18,
-    padding: 15,
-    borderRadius: 17,
     backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
   },
 
-  eventIconBox: {
-    width: 50,
-    height: 50,
-    borderRadius: 14,
-    backgroundColor: '#E8F0F5',
+  eventDateBox: {
+    width: 55,
+    height: 63,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
 
-  eventIcon: {
-    fontSize: 24,
+  eventMonth: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
+  },
+
+  eventDay: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+    marginTop: 1,
   },
 
   eventContent: {
@@ -545,52 +1177,67 @@ const styles = StyleSheet.create({
   },
 
   eventTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#172033',
+    color: '#111111',
+    fontSize: 13,
+    fontWeight: '900',
   },
 
-  eventDate: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#123B5D',
-    marginTop: 4,
-  },
-
-  eventLocation: {
+  eventInfo: {
+    color: '#777777',
     fontSize: 9,
-    color: '#7A8494',
-    marginTop: 4,
+    marginTop: 5,
   },
 
-  noticeCard: {
-    marginHorizontal: 18,
+  cardArrow: {
+    color: '#999999',
+    fontSize: 26,
+    marginLeft: 6,
+  },
+
+  /* COMMUNITY */
+
+  messageCard: {
     marginTop: 18,
-    padding: 16,
-    borderRadius: 17,
-    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 17,
     flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
 
-  noticeIcon: {
-    fontSize: 22,
+  messageIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF22',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  noticeContent: {
+  messageIconText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+  },
+
+  messageContent: {
     flex: 1,
     marginLeft: 12,
   },
 
-  noticeTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#172033',
+  messageTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
   },
 
-  noticeText: {
-    fontSize: 10,
-    color: '#6B7280',
-    lineHeight: 16,
-    marginTop: 5,
+  messageText: {
+    color: '#E5E5E5',
+    fontSize: 9,
+    lineHeight: 14,
+    marginTop: 4,
+  },
+
+  bottomSpace: {
+    height: 35,
   },
 });

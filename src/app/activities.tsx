@@ -1,13 +1,14 @@
 import {
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 
 import { useEffect, useState } from 'react';
 
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
 
 type ActivityItem = {
@@ -58,7 +59,17 @@ export default function ActivitiesScreen() {
       style={styles.container}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.header}>
+      {/* Header */}
+      <LinearGradient
+        colors={['#D32F2F', '#8E1B1B', '#0B0B0B']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <Text style={styles.headerSmall}>
+          SALEM YMA
+        </Text>
+
         <Text style={styles.headerTitle}>
           Hmalakna
         </Text>
@@ -75,17 +86,21 @@ export default function ActivitiesScreen() {
             ↻ Refresh
           </Text>
         </Pressable>
-      </View>
+      </LinearGradient>
 
+      {/* Section */}
       <Text style={styles.sectionTitle}>
         Recent Activities
       </Text>
 
+      {/* Loading */}
       {loading ? (
         <View style={styles.messageCard}>
-          <Text style={styles.messageIcon}>
-            🤝
-          </Text>
+          <View style={styles.messageIconBox}>
+            <Text style={styles.messageIcon}>
+              🤝
+            </Text>
+          </View>
 
           <Text style={styles.messageTitle}>
             Loading Activities...
@@ -96,10 +111,13 @@ export default function ActivitiesScreen() {
           </Text>
         </View>
       ) : activities.length === 0 ? (
+        /* Empty State */
         <View style={styles.messageCard}>
-          <Text style={styles.messageIcon}>
-            🤝
-          </Text>
+          <View style={styles.messageIconBox}>
+            <Text style={styles.messageIcon}>
+              🤝
+            </Text>
+          </View>
 
           <Text style={styles.messageTitle}>
             No Activities Yet
@@ -111,16 +129,22 @@ export default function ActivitiesScreen() {
           </Text>
         </View>
       ) : (
+        /* Activities */
         activities.map((item) => (
           <View
             key={item.id}
             style={styles.activityCard}
           >
-            <View style={styles.activityIcon}>
+            <LinearGradient
+              colors={['#D32F2F', '#8E1B1B', '#111111']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.activityIcon}
+            >
               <Text style={styles.iconText}>
                 🤝
               </Text>
-            </View>
+            </LinearGradient>
 
             <View style={styles.activityContent}>
               {item.category ? (
@@ -137,13 +161,24 @@ export default function ActivitiesScreen() {
 
               {item.activity_date ? (
                 <Text style={styles.activityDate}>
-                  {item.activity_date}
+                  {new Date(
+                    item.activity_date
+                  ).toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
                 </Text>
               ) : null}
 
-              <Text style={styles.activityText}>
-                {item.description || ''}
-              </Text>
+              {item.description ? (
+                <Text
+                  style={styles.activityText}
+                  numberOfLines={4}
+                >
+                  {item.description}
+                </Text>
+              ) : null}
 
               {item.location ? (
                 <Text style={styles.location}>
@@ -163,47 +198,58 @@ export default function ActivitiesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F6F8',
+    backgroundColor: '#F5F5F5',
   },
 
   header: {
-    backgroundColor: '#123B5D',
-    paddingTop: 55,
-    paddingHorizontal: 18,
-    paddingBottom: 22,
+    paddingTop: 58,
+    paddingHorizontal: 20,
+    paddingBottom: 25,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+
+  headerSmall: {
+    color: '#FFB4B4',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginBottom: 5,
   },
 
   headerTitle: {
     color: '#FFFFFF',
-    fontSize: 26,
+    fontSize: 27,
     fontWeight: '900',
   },
 
   headerText: {
-    color: '#D8E6F0',
+    color: '#F5DADA',
     fontSize: 12,
     marginTop: 5,
   },
 
   refreshButton: {
     alignSelf: 'flex-start',
-    marginTop: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    marginTop: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 9,
     backgroundColor: '#FFFFFF22',
+    borderWidth: 1,
+    borderColor: '#FFFFFF33',
   },
 
   refreshText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '900',
   },
 
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '800',
-    color: '#172033',
+    fontWeight: '900',
+    color: '#151515',
     marginHorizontal: 18,
     marginTop: 22,
     marginBottom: 12,
@@ -216,13 +262,20 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: '#FFFFFF',
     flexDirection: 'row',
+    elevation: 3,
+    shadowColor: '#000000',
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
   },
 
   activityIcon: {
     width: 54,
     height: 54,
     borderRadius: 15,
-    backgroundColor: '#E8F0F5',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -238,7 +291,7 @@ const styles = StyleSheet.create({
 
   categoryBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#E8F0F5',
+    backgroundColor: '#FBEAEA',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 5,
@@ -247,58 +300,77 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 8,
     fontWeight: '900',
-    color: '#123B5D',
+    color: '#C62828',
+    letterSpacing: 0.4,
   },
 
   activityTitle: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#172033',
+    fontWeight: '900',
+    color: '#151515',
     marginTop: 7,
+    lineHeight: 20,
   },
 
   activityDate: {
     fontSize: 9,
-    fontWeight: '700',
-    color: '#123B5D',
-    marginTop: 4,
+    fontWeight: '800',
+    color: '#C62828',
+    marginTop: 5,
   },
 
   activityText: {
     fontSize: 11,
-    color: '#7A8494',
-    lineHeight: 16,
+    color: '#666666',
+    lineHeight: 17,
     marginTop: 5,
   },
 
   location: {
     fontSize: 10,
-    color: '#667085',
+    color: '#666666',
     marginTop: 7,
   },
 
   messageCard: {
     marginHorizontal: 18,
-    padding: 25,
+    padding: 28,
     borderRadius: 18,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+  },
+
+  messageIconBox: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: '#FBEAEA',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   messageIcon: {
-    fontSize: 32,
+    fontSize: 30,
   },
 
   messageTitle: {
     fontSize: 16,
-    fontWeight: '800',
-    color: '#172033',
-    marginTop: 8,
+    fontWeight: '900',
+    color: '#151515',
+    marginTop: 10,
   },
 
   messageText: {
     fontSize: 11,
-    color: '#7A8494',
+    color: '#777777',
     textAlign: 'center',
     marginTop: 6,
     lineHeight: 17,
