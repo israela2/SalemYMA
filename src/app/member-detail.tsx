@@ -173,24 +173,19 @@ export default function MemberDetailScreen() {
     setSaving(false);
   }
 
-  function confirmDelete() {
-    Alert.alert(
-      'Delete Member',
-      `Are you sure you want to delete ${
-        fullName || 'this member'
-      }?`,
-      [
-        {
-          text: 'CANCEL',
-          style: 'cancel',
-        },
-        {
-          text: 'DELETE',
-          style: 'destructive',
-          onPress: deleteMember,
-        },
-      ]
-    );
+  async function confirmDelete() {
+    const message = `Are you sure you want to delete ${fullName || 'this member'}?`;
+    const confirmed =
+      typeof window !== 'undefined' &&
+      (globalThis as any).window
+        ? window.confirm(`Delete Member\n\n${message}`)
+        : await new Promise<boolean>((resolve) => {
+            Alert.alert('Delete Member', message, [
+              { text: 'CANCEL', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'DELETE', style: 'destructive', onPress: () => resolve(true) },
+            ]);
+          });
+    if (confirmed) await deleteMember();
   }
 
   async function deleteMember() {
@@ -216,16 +211,7 @@ export default function MemberDetailScreen() {
 
     setDeleting(false);
 
-    Alert.alert(
-      'Member Deleted',
-      'Member record chu successfully delete a ni.',
-      [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/admin'),
-        },
-      ]
-    );
+    router.replace('/admin');
   }
 
   if (loading) {

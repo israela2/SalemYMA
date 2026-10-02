@@ -17,6 +17,7 @@ export default function MoreScreen() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
 
   useEffect(() => {
     checkLogin();
@@ -30,6 +31,7 @@ export default function MoreScreen() {
         setIsAdmin(false);
       } else {
         checkAdmin(session.user.id);
+        loadProfilePhoto(session.user.id);
       }
     });
 
@@ -47,9 +49,23 @@ export default function MoreScreen() {
 
     if (session) {
       await checkAdmin(session.user.id);
+      await loadProfilePhoto(session.user.id);
     } else {
       setIsAdmin(false);
     }
+  }
+
+
+  async function loadProfilePhoto(userId: string) {
+    const { data } = await supabase
+      .from('members')
+      .select('profile_photo')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const { data: { user } } = await supabase.auth.getUser();
+    const metadataPhoto = user?.user_metadata?.profile_photo || user?.user_metadata?.avatar_url || null;
+    const photo = data?.profile_photo || metadataPhoto || null;
+    setProfilePhoto(photo);
   }
 
   async function checkAdmin(userId: string) {
@@ -320,11 +336,13 @@ export default function MoreScreen() {
             ]}
             onPress={() => router.push('/profile')}
           >
-            <View style={[styles.iconBox, styles.grayBox]}>
-              <Text style={styles.menuIcon}>
-                👤
-              </Text>
-            </View>
+            {profilePhoto ? (
+              <Image source={{ uri: profilePhoto }} style={styles.profileMenuPhoto} />
+            ) : (
+              <View style={[styles.iconBox, styles.grayBox]}>
+                <Text style={styles.menuIcon}>👤</Text>
+              </View>
+            )}
 
             <View style={styles.menuContent}>
               <Text style={styles.menuTitle}>
@@ -596,6 +614,8 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
   },
+
+  profileMenuPhoto: { width: 45, height: 45, borderRadius: 14, backgroundColor: '#F5F5F5' },
 
   profileInfo: {
     flex: 1,

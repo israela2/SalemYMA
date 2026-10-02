@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -163,6 +163,18 @@ function normalizeSectionLeaderPosition(position: string) {
   return LEGACY_SECTION_POSITION_MAP[position] ?? position;
 }
 
+function normalizeSectionName(section: string) {
+  const map: Record<string, string> = {
+    'Section - I': 'Section I',
+    'Section - II': 'Section II',
+    'Section - III': 'Section III',
+    'Section I': 'Section I',
+    'Section II': 'Section II',
+    'Section III': 'Section III',
+  };
+  return map[section] ?? section;
+}
+
 
 type CemeteryRecord = {
   id: number;
@@ -206,6 +218,45 @@ const BORDER = '#E5E5E5';
 const TEXT = '#151515';
 const MUTED = '#777777';
 const LIGHT_RED = '#FBEAEA';
+
+
+async function webConfirm(title: string, message: string): Promise<boolean> {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return window.confirm(`${title}\n\n${message}`);
+  }
+  return await new Promise<boolean>((resolve) => {
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'OK', onPress: () => resolve(true) },
+    ]);
+  });
+}
+
+function WebEventDateInput({ value, onChange, mode }: { value: Date | null; onChange: (date: Date) => void; mode: 'date' | 'time' }) {
+  if (Platform.OS !== 'web') return null;
+  const date = value || new Date();
+  const inputValue = mode === 'date'
+    ? `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
+    : `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+  return React.createElement('input', {
+    type: mode,
+    value: inputValue,
+    onChange: (e: any) => {
+      const raw = e?.target?.value;
+      if (!raw) return;
+      const next = new Date(date);
+      if (mode === 'date') {
+        const [y,m,d] = raw.split('-').map(Number);
+        next.setFullYear(y, m-1, d);
+      } else {
+        const [h,min] = raw.split(':').map(Number);
+        next.setHours(h, min, 0, 0);
+      }
+      onChange(next);
+    },
+    style: { width: '100%', minHeight: 44, padding: '10px 12px', border: '1px solid #E5E5E5', borderRadius: 10, fontSize: 15, background: '#FFFFFF', boxSizing: 'border-box' },
+  });
+}
 
 function formatDate(value?: string | null) {
   if (!value) return '-';
@@ -634,7 +685,7 @@ export default function AdminScreen() {
       // Read it first so Admin Profile and Member Profile always show the same data.
       const { data: member, error: memberError } = await supabase
         .from('members')
-        .select('full_name, phone, email, section')
+        .select('full_name, phone, email, section, profile_photo')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -654,7 +705,8 @@ export default function AdminScreen() {
       setProfileEmail(member?.email || user.email || '');
       setProfileSection(member?.section || metadata.section || 'Section - I');
       setProfilePhoto(
-        metadata.avatar_url ||
+        member?.profile_photo ||
+          metadata.avatar_url ||
           metadata.profile_photo ||
           '',
       );
@@ -1317,6 +1369,7 @@ export default function AdminScreen() {
         setSectionLeaders(
           (sectionLeadersResult.data || []).map((item) => ({
             ...(item as SectionLeader),
+            section: normalizeSectionName((item as SectionLeader).section),
             position: normalizeSectionLeaderPosition((item as SectionLeader).position),
           })),
         );
@@ -1620,38 +1673,14 @@ export default function AdminScreen() {
   }
 
   async function deleteNews(item: NewsItem) {
-    Alert.alert(
-      'Delete news?',
-      `Delete "${item.title}" permanently?`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('news')
-                .delete()
-                .eq('id', item.id);
-
-              if (error) throw error;
-
-              await loadAll();
-            } catch (error: any) {
-              Alert.alert(
-                'Delete failed',
-                error?.message ||
-                  'Unable to delete news.',
-              );
-            }
-          },
-        },
-      ],
-    );
+    if (!(await webConfirm('Delete news?', `Delete "${item.title}" permanently?`))) return;
+    try {
+      const { error } = await supabase.from('news').delete().eq('id', item.id);
+      if (error) throw error;
+      await loadAll();
+    } catch (error: any) {
+      Alert.alert('Delete failed', error?.message || 'Unable to delete news.');
+    }
   }
 
   function resetEventForm() {
@@ -1842,38 +1871,14 @@ export default function AdminScreen() {
   }
 
   async function deleteEvent(item: EventItem) {
-    Alert.alert(
-      'Delete event?',
-      `Delete "${item.title}" permanently?`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('events')
-                .delete()
-                .eq('id', item.id);
-
-              if (error) throw error;
-
-              await loadAll();
-            } catch (error: any) {
-              Alert.alert(
-                'Delete failed',
-                error?.message ||
-                  'Unable to delete event.',
-              );
-            }
-          },
-        },
-      ],
-    );
+    if (!(await webConfirm('Delete event?', `Delete "${item.title}" permanently?`))) return;
+    try {
+      const { error } = await supabase.from('events').delete().eq('id', item.id);
+      if (error) throw error;
+      await loadAll();
+    } catch (error: any) {
+      Alert.alert('Delete failed', error?.message || 'Unable to delete event.');
+    }
   }
 
   async function deleteGalleryItem(
@@ -2118,101 +2123,30 @@ export default function AdminScreen() {
     }
   }
 
-  async function markWasteBillPaid(
-    bill: WasteBill,
-  ) {
-    Alert.alert(
-      'Mark bill as paid?',
-      `₹${Number(
-        bill.amount || 0,
-      ).toFixed(2)} • ${
-        bill.bill_month || '-'
-      }`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Mark Paid',
-          onPress: async () => {
-            try {
-              const receiptNo =
-                `YMA-${Date.now()}`;
-
-              const { error } =
-                await supabase
-                  .from('waste_bills')
-                  .update({
-                    status: 'paid',
-                    paid_at:
-                      new Date().toISOString(),
-                    receipt_no: receiptNo,
-                    payment_method: 'Admin',
-                    updated_at:
-                      new Date().toISOString(),
-                  })
-                  .eq('id', bill.id);
-
-              if (error) throw error;
-
-              Alert.alert(
-                'Updated',
-                'Bill marked as paid.',
-              );
-
-              await loadAll();
-            } catch (error: any) {
-              Alert.alert(
-                'Update failed',
-                error?.message ||
-                  'Unable to update bill.',
-              );
-            }
-          },
-        },
-      ],
-    );
+  async function markWasteBillPaid(bill: WasteBill) {
+    if (!(await webConfirm('Verify and issue receipt?', `₹${Number(bill.amount || 0).toFixed(2)} • ${bill.bill_month || '-'}`))) return;
+    try {
+      const receiptNo = `YMA-${Date.now()}`;
+      const { error } = await supabase.from('waste_bills').update({
+        status: 'paid', paid_at: new Date().toISOString(), receipt_no: receiptNo,
+        payment_method: 'Admin', updated_at: new Date().toISOString(),
+      }).eq('id', bill.id);
+      if (error) throw error;
+      await loadAll();
+    } catch (error: any) {
+      Alert.alert('Update failed', error?.message || 'Unable to update bill.');
+    }
   }
 
-  async function deleteWasteBill(
-    bill: WasteBill,
-  ) {
-    Alert.alert(
-      'Delete bill?',
-      `Delete ${
-        bill.bill_month || 'this bill'
-      } permanently?`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } =
-                await supabase
-                  .from('waste_bills')
-                  .delete()
-                  .eq('id', bill.id);
-
-              if (error) throw error;
-
-              await loadAll();
-            } catch (error: any) {
-              Alert.alert(
-                'Delete failed',
-                error?.message ||
-                  'Unable to delete bill.',
-              );
-            }
-          },
-        },
-      ],
-    );
+  async function deleteWasteBill(bill: WasteBill) {
+    if (!(await webConfirm('Delete bill?', `Delete ${bill.bill_month || 'this bill'} permanently?`))) return;
+    try {
+      const { error } = await supabase.from('waste_bills').delete().eq('id', bill.id);
+      if (error) throw error;
+      await loadAll();
+    } catch (error: any) {
+      Alert.alert('Delete failed', error?.message || 'Unable to delete bill.');
+    }
   }
 
   function resetZonunForm() {
@@ -2339,49 +2273,16 @@ export default function AdminScreen() {
   }
 
   async function deleteZonun(item: ZonunItem) {
-    Alert.alert(
-      'Delete Zonun?',
-      `Delete "${item.title}" permanently?`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('zonun')
-                .delete()
-                .eq('id', item.id);
-
-              if (error) throw error;
-
-              const storagePath =
-                getZonunStoragePathFromUrl(
-                  item.pdf_url,
-                );
-
-              if (storagePath) {
-                await supabase.storage
-                  .from('zonun')
-                  .remove([storagePath]);
-              }
-
-              await loadAll();
-            } catch (error: any) {
-              Alert.alert(
-                'Delete failed',
-                error?.message ||
-                  'Unable to delete Zonun.',
-              );
-            }
-          },
-        },
-      ],
-    );
+    if (!(await webConfirm('Delete Zonun?', `Delete "${item.title}" permanently?`))) return;
+    try {
+      const { error } = await supabase.from('zonun').delete().eq('id', item.id);
+      if (error) throw error;
+      const storagePath = getZonunStoragePathFromUrl(item.pdf_url);
+      if (storagePath) { try { await supabase.storage.from('zonun').remove([storagePath]); } catch {} }
+      await loadAll();
+    } catch (error: any) {
+      Alert.alert('Delete failed', error?.message || 'Unable to delete Zonun.');
+    }
   }
 
   function resetLeaderForm() {
@@ -2440,7 +2341,8 @@ export default function AdminScreen() {
       return;
     }
 
-    const order = Number(leaderDisplayOrder);
+    const positionOrder = BRANCH_LEADER_POSITIONS.indexOf(leaderPosition) + 1;
+    const order = editingLeaderId ? Number(leaderDisplayOrder) : positionOrder;
     if (!Number.isFinite(order) || order < 1) {
       Alert.alert('Invalid order', 'Display order must be 1 or higher.');
       return;
@@ -2519,50 +2421,24 @@ export default function AdminScreen() {
   }
 
   async function deleteBranchLeader(item: BranchLeader) {
-    Alert.alert(
-      'Delete branch leader?',
-      `Delete ${item.full_name} from Branch Leaders?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('branch_leaders')
-                .delete()
-                .eq('id', item.id);
-
-              if (error) throw error;
-
-              const storagePath = getStoragePathFromUrl(item.photo_url);
-              if (storagePath) {
-                await supabase.storage.from('gallery').remove([storagePath]);
-              }
-
-              if (editingLeaderId === item.id) {
-                resetLeaderForm();
-              }
-
-              await loadAll();
-            } catch (error: any) {
-              Alert.alert(
-                'Delete failed',
-                error?.message || 'Unable to delete branch leader.',
-              );
-            }
-          },
-        },
-      ],
-    );
+    if (!(await webConfirm('Delete branch leader?', `Delete ${item.full_name} from Branch Leaders?`))) return;
+    try {
+      const { error } = await supabase.from('branch_leaders').delete().eq('id', item.id);
+      if (error) throw error;
+      const storagePath = getStoragePathFromUrl(item.photo_url);
+      if (storagePath) { try { await supabase.storage.from('gallery').remove([storagePath]); } catch {} }
+      if (editingLeaderId === item.id) resetLeaderForm();
+      await loadAll();
+    } catch (error: any) {
+      Alert.alert('Delete failed', error?.message || 'Unable to delete branch leader.');
+    }
   }
 
   function resetSectionLeaderForm() {
     setSectionLeaderSection('Section I'); setSectionLeaderPosition('Leader'); setSectionLeaderFullName(''); setSectionLeaderPhone(''); setSectionLeaderPhoto(''); setSectionLeaderDisplayOrder('1'); setSectionLeaderActive(true); setEditingSectionLeaderId(null);
   }
   function editSectionLeader(item: SectionLeader) {
-    setSectionLeaderSection(item.section); setSectionLeaderPosition(item.position); setSectionLeaderFullName(item.full_name); setSectionLeaderPhone(item.phone || ''); setSectionLeaderPhoto(item.photo_url || ''); setSectionLeaderDisplayOrder(String(item.display_order || 1)); setSectionLeaderActive(item.is_active !== false); setEditingSectionLeaderId(item.id); setSection('section-leaders');
+    setSectionLeaderSection(normalizeSectionName(item.section)); setSectionLeaderPosition(item.position); setSectionLeaderFullName(item.full_name); setSectionLeaderPhone(item.phone || ''); setSectionLeaderPhoto(item.photo_url || ''); setSectionLeaderDisplayOrder(String(item.display_order || 1)); setSectionLeaderActive(item.is_active !== false); setEditingSectionLeaderId(item.id); setSection('section-leaders');
   }
   async function pickSectionLeaderPhoto() {
     if (!(await ensureImageLibraryPermission())) return;
@@ -2571,7 +2447,7 @@ export default function AdminScreen() {
   }
   async function saveSectionLeader() {
     if (!sectionLeaderFullName.trim()) { Alert.alert('Missing name','Please enter the leader name.'); return; }
-    const order=Number(sectionLeaderDisplayOrder); if (!Number.isInteger(order)||order<1||order>6) { Alert.alert('Invalid position order','Position order must be between 1 and 6.'); return; }
+    const positionOrder=SECTION_LEADER_POSITIONS.indexOf(sectionLeaderPosition)+1; const order=editingSectionLeaderId?Number(sectionLeaderDisplayOrder):positionOrder; if (!Number.isInteger(order)||order<1||order>6) { Alert.alert('Invalid position order','Position order must be between 1 and 6.'); return; }
     const duplicatePosition=sectionLeaders.find(i=>i.section===sectionLeaderSection&&i.position===sectionLeaderPosition&&i.id!==editingSectionLeaderId); if(duplicatePosition){Alert.alert('Position already used',`${sectionLeaderPosition} already exists in ${sectionLeaderSection}.`);return;}
     const duplicateOrder=sectionLeaders.find(i=>i.section===sectionLeaderSection&&i.display_order===order&&i.id!==editingSectionLeaderId); if(duplicateOrder){Alert.alert('Position order already used',`Position order ${order} is already assigned in ${sectionLeaderSection}.`);return;}
     try { setSavingSectionLeader(true); const payload={section:sectionLeaderSection,position:sectionLeaderPosition,full_name:sectionLeaderFullName.trim(),phone:sectionLeaderPhone.trim()||null,photo_url:sectionLeaderPhoto||null,display_order:order,is_active:sectionLeaderActive};
@@ -2581,7 +2457,19 @@ export default function AdminScreen() {
     } catch(error:any){Alert.alert('Save failed',error?.message || 'Unable to save section leader.');} finally {setSavingSectionLeader(false);}
   }
   async function toggleSectionLeader(item: SectionLeader) { try {const{error}=await supabase.from('section_leaders').update({is_active:!item.is_active}).eq('id',item.id);if(error)throw error;await loadAll();}catch(error:any){Alert.alert('Update failed',error?.message || 'Unable to change section leader visibility.');} }
-  async function deleteSectionLeader(item: SectionLeader) { Alert.alert('Delete section leader?',`Delete ${item.full_name} from ${item.section}?`,[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:async()=>{try{const{error}=await supabase.from('section_leaders').delete().eq('id',item.id);if(error)throw error;const storagePath=getStoragePathFromUrl(item.photo_url);if(storagePath)await supabase.storage.from('gallery').remove([storagePath]);if(editingSectionLeaderId===item.id)resetSectionLeaderForm();await loadAll();}catch(error:any){Alert.alert('Delete failed',error?.message || 'Unable to delete section leader.');}}}]); }
+  async function deleteSectionLeader(item: SectionLeader) {
+    if (!(await webConfirm('Delete section leader?', `Delete ${item.full_name} from ${item.section}?`))) return;
+    try {
+      const { error } = await supabase.from('section_leaders').delete().eq('id', item.id);
+      if (error) throw error;
+      const storagePath = getStoragePathFromUrl(item.photo_url);
+      if (storagePath) { try { await supabase.storage.from('gallery').remove([storagePath]); } catch {} }
+      if (editingSectionLeaderId === item.id) resetSectionLeaderForm();
+      await loadAll();
+    } catch (error: any) {
+      Alert.alert('Delete failed', error?.message || 'Unable to delete section leader.');
+    }
+  }
 
   function resetCemeteryForm() {
     setCemeteryDeceasedName('');
@@ -4731,62 +4619,28 @@ export default function AdminScreen() {
                 </View>
               )}
 
-              {showEventDatePicker && (
-                <DateTimePicker
-                  value={
-                    eventDateValue ||
-                    new Date()
-                  }
-                  mode="date"
-                  display="default"
-                  onChange={(
-                    event,
-                    selectedDate,
-                  ) => {
-                    if (
-                      event.type ===
-                      'dismissed'
-                    ) {
-                      setShowEventDatePicker(
-                        false,
-                      );
-                      return;
-                    }
-
-                    handleEventDateChange(
-                      selectedDate,
-                    );
-                  }}
-                />
-              )}
-
-              {showEventTimePicker && (
-                <DateTimePicker
-                  value={
-                    eventDateValue ||
-                    new Date()
-                  }
-                  mode="time"
-                  display="default"
-                  onChange={(
-                    event,
-                    selectedTime,
-                  ) => {
-                    if (
-                      event.type ===
-                      'dismissed'
-                    ) {
-                      setShowEventTimePicker(
-                        false,
-                      );
-                      return;
-                    }
-
-                    handleEventTimeChange(
-                      selectedTime,
-                    );
-                  }}
-                />
+              {Platform.OS === 'web' ? (
+                <View style={{ gap: 10 }}>
+                  <Text style={styles.label}>Event Date</Text>
+                  <WebEventDateInput value={eventDateValue} mode="date" onChange={handleEventDateChange} />
+                  <Text style={styles.label}>Event Time</Text>
+                  <WebEventDateInput value={eventDateValue} mode="time" onChange={handleEventTimeChange} />
+                </View>
+              ) : (
+                <>
+                  {showEventDatePicker && (
+                    <DateTimePicker value={eventDateValue || new Date()} mode="date" display="default" onChange={(event, selectedDate) => {
+                      if (event.type === 'dismissed') { setShowEventDatePicker(false); return; }
+                      handleEventDateChange(selectedDate);
+                    }} />
+                  )}
+                  {showEventTimePicker && (
+                    <DateTimePicker value={eventDateValue || new Date()} mode="time" display="default" onChange={(event, selectedTime) => {
+                      if (event.type === 'dismissed') { setShowEventTimePicker(false); return; }
+                      handleEventTimeChange(selectedTime);
+                    }} />
+                  )}
+                </>
               )}
 
               <Text style={styles.label}>
