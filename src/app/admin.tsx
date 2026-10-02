@@ -1330,6 +1330,8 @@ export default function AdminScreen() {
         setEvents(
           eventsResult.data || [],
         );
+      } else {
+        console.log('Events load error:', eventsResult.error.message);
       }
 
       if (!wasteBillsResult.error) {
@@ -1375,7 +1377,6 @@ export default function AdminScreen() {
         );
       } else {
         console.log('Section leaders load error:', sectionLeadersResult.error.message);
-        setSectionLeaders([]);
       }
 
       if (!cemeteryResult.error) {
@@ -1810,32 +1811,20 @@ export default function AdminScreen() {
           .from('events')
           .update(payload)
           .eq('id', editingEventId);
-
         if (error) throw error;
-
-        Alert.alert(
-          'Updated',
-          'Event updated successfully.',
-        );
+        setEvents(current => current.map(item => item.id === editingEventId ? { ...item, ...payload } : item));
+        Alert.alert('Updated','Event updated successfully.');
       } else {
+        const createdAt = new Date().toISOString();
         const { error } = await supabase
           .from('events')
-          .insert({
-            ...payload,
-            created_at:
-              new Date().toISOString(),
-          });
-
+          .insert({ ...payload, created_at: createdAt });
         if (error) throw error;
-
-        Alert.alert(
-          'Published',
-          'Event published successfully.',
-        );
+        setEvents(current => [{ id: Date.now(), ...payload, created_at: createdAt }, ...current]);
+        Alert.alert('Published','Event published successfully.');
       }
 
       resetEventForm();
-      await loadAll();
     } catch (error: any) {
       Alert.alert(
         'Save failed',
@@ -2451,9 +2440,9 @@ export default function AdminScreen() {
     const duplicatePosition=sectionLeaders.find(i=>i.section===sectionLeaderSection&&i.position===sectionLeaderPosition&&i.id!==editingSectionLeaderId); if(duplicatePosition){Alert.alert('Position already used',`${sectionLeaderPosition} already exists in ${sectionLeaderSection}.`);return;}
     const duplicateOrder=sectionLeaders.find(i=>i.section===sectionLeaderSection&&i.display_order===order&&i.id!==editingSectionLeaderId); if(duplicateOrder){Alert.alert('Position order already used',`Position order ${order} is already assigned in ${sectionLeaderSection}.`);return;}
     try { setSavingSectionLeader(true); const payload={section:sectionLeaderSection,position:sectionLeaderPosition,full_name:sectionLeaderFullName.trim(),phone:sectionLeaderPhone.trim()||null,photo_url:sectionLeaderPhoto||null,display_order:order,is_active:sectionLeaderActive};
-      if(editingSectionLeaderId){const{error}=await supabase.from('section_leaders').update(payload).eq('id',editingSectionLeaderId);if(error)throw error;Alert.alert('Updated','Section leader updated successfully.');}
-      else{const{error}=await supabase.from('section_leaders').insert(payload);if(error)throw error;Alert.alert('Added','Section leader added successfully.');}
-      resetSectionLeaderForm(); await loadAll();
+      if(editingSectionLeaderId){const{error}=await supabase.from('section_leaders').update(payload).eq('id',editingSectionLeaderId);if(error)throw error;setSectionLeaders(current=>current.map(item=>item.id===editingSectionLeaderId?{...item,...payload}:item));Alert.alert('Updated','Section leader updated successfully.');}
+      else{const{error}=await supabase.from('section_leaders').insert(payload);if(error)throw error;const localItem: SectionLeader={id:Date.now(),...payload};setSectionLeaders(current=>[...current,localItem]);Alert.alert('Added','Section leader added successfully.');}
+      resetSectionLeaderForm();
     } catch(error:any){Alert.alert('Save failed',error?.message || 'Unable to save section leader.');} finally {setSavingSectionLeader(false);}
   }
   async function toggleSectionLeader(item: SectionLeader) { try {const{error}=await supabase.from('section_leaders').update({is_active:!item.is_active}).eq('id',item.id);if(error)throw error;await loadAll();}catch(error:any){Alert.alert('Update failed',error?.message || 'Unable to change section leader visibility.');} }
