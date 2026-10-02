@@ -5754,7 +5754,13 @@ export default function AdminScreen() {
                 {BRANCH_LEADER_POSITIONS.map((position) => (
                   <Pressable
                     key={position}
-                    onPress={() => setLeaderPosition(position)}
+                    onPress={() => {
+                      setLeaderPosition(position);
+                      if (!editingLeaderId) {
+                        const positionIndex = BRANCH_LEADER_POSITIONS.indexOf(position);
+                        if (positionIndex >= 0) setLeaderDisplayOrder(String(positionIndex + 1));
+                      }
+                    }}
                     style={[
                       styles.positionChip,
                       leaderPosition === position && styles.positionChipActive,
@@ -5939,7 +5945,13 @@ export default function AdminScreen() {
               <Text style={styles.formTitle}>{editingSectionLeaderId?'Edit Section Hruaitu':'Add Section Hruaitu'}</Text>
               {editingSectionLeaderId?<Pressable style={styles.smallButton} onPress={resetSectionLeaderForm} disabled={savingSectionLeader}><Text style={styles.smallButtonText}>Cancel Edit</Text></Pressable>:null}
               <Text style={styles.label}>Section</Text><View style={styles.positionGrid}>{SECTION_NAMES.map(item=><Pressable key={item} onPress={()=>setSectionLeaderSection(item)} style={[styles.positionChip,sectionLeaderSection===item&&styles.positionChipActive]}><Text style={[styles.positionChipText,sectionLeaderSection===item&&styles.positionChipTextActive]}>{item}</Text></Pressable>)}</View>
-              <Text style={styles.label}>Position</Text><View style={styles.positionGrid}>{SECTION_LEADER_POSITIONS.map(item=><Pressable key={item} onPress={()=>setSectionLeaderPosition(item)} style={[styles.positionChip,sectionLeaderPosition===item&&styles.positionChipActive]}><Text style={[styles.positionChipText,sectionLeaderPosition===item&&styles.positionChipTextActive]}>{item}</Text></Pressable>)}</View>
+              <Text style={styles.label}>Position</Text><View style={styles.positionGrid}>{SECTION_LEADER_POSITIONS.map(item=><Pressable key={item} onPress={()=>{
+                setSectionLeaderPosition(item);
+                if (!editingSectionLeaderId) {
+                  const positionIndex = SECTION_LEADER_POSITIONS.indexOf(item);
+                  if (positionIndex >= 0) setSectionLeaderDisplayOrder(String(positionIndex + 1));
+                }
+              }} style={[styles.positionChip,sectionLeaderPosition===item&&styles.positionChipActive]}><Text style={[styles.positionChipText,sectionLeaderPosition===item&&styles.positionChipTextActive]}>{item}</Text></Pressable>)}</View>
               <Text style={styles.label}>Full Name</Text><TextInput style={styles.input} value={sectionLeaderFullName} onChangeText={setSectionLeaderFullName} placeholder="Enter full name" placeholderTextColor="#999" />
               <Text style={styles.label}>Contact</Text><TextInput style={styles.input} value={sectionLeaderPhone} onChangeText={setSectionLeaderPhone} placeholder="Contact number" placeholderTextColor="#999" keyboardType="phone-pad" />
               <Text style={styles.label}>Display Order (1–6)</Text><TextInput style={styles.input} value={sectionLeaderDisplayOrder} onChangeText={setSectionLeaderDisplayOrder} placeholder="1" placeholderTextColor="#999" keyboardType="number-pad" />
