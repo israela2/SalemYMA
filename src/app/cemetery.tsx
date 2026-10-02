@@ -6,6 +6,7 @@ import {
     Alert,
     Image,
     Linking,
+    Modal,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -69,11 +70,7 @@ function formatDate(value?: string | null) {
     return value;
   }
 
-  return date.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
 }
 
 function getAgeAtDeath(
@@ -114,7 +111,9 @@ export default function CemeteryScreen() {
   const [records, setRecords] = useState<CemeteryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [expandedRecordId, setExpandedRecordId] = useState<number | null>(null);
 
   const loadRecords = useCallback(async () => {
     try {
@@ -243,6 +242,12 @@ export default function CemeteryScreen() {
       item.date_of_birth,
       item.date_of_death,
     );
+    const isExpanded = expandedRecordId === item.id;
+    const displayYear = item.date_of_death
+      ? new Date(item.date_of_death).getFullYear()
+      : item.burial_date
+        ? new Date(item.burial_date).getFullYear()
+        : null;
 
     const hasLocation =
       item.latitude !== null &&
@@ -251,253 +256,107 @@ export default function CemeteryScreen() {
       item.longitude !== undefined;
 
     return (
-      <View
-        key={item.id}
-        style={styles.recordCard}
-      >
-        {/* Grave Photo */}
-        {item.grave_photo_url ? (
-          <Image
-            source={{
-              uri: item.grave_photo_url,
-            }}
-            style={styles.gravePhoto}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.photoPlaceholder}>
-            <Text style={styles.photoPlaceholderIcon}>
-              🪦
-            </Text>
-
-            <Text
-              style={styles.photoPlaceholderText}
-            >
-              Grave photo not available
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.recordContent}>
-          {/* Name */}
-          <Text style={styles.deceasedName}>
-            {item.deceased_name}
-          </Text>
-
-          {item.family_name ? (
-            <Text style={styles.familyName}>
-              Family: {item.family_name}
-            </Text>
-          ) : null}
-
-          {/* Date information */}
-          <View style={styles.dateBox}>
-            {item.date_of_birth ? (
-              <View style={styles.dateItem}>
-                <Text style={styles.dateLabel}>
-                  BORN
-                </Text>
-
-                <Text style={styles.dateValue}>
-                  {formatDate(
-                    item.date_of_birth,
-                  )}
-                </Text>
-              </View>
-            ) : null}
-
-            {item.date_of_death ? (
-              <View style={styles.dateItem}>
-                <Text style={styles.dateLabel}>
-                  DIED
-                </Text>
-
-                <Text style={styles.dateValue}>
-                  {formatDate(
-                    item.date_of_death,
-                  )}
-                </Text>
-              </View>
-            ) : null}
-
-            {age !== null ? (
-              <View style={styles.dateItem}>
-                <Text style={styles.dateLabel}>
-                  AGE
-                </Text>
-
-                <Text style={styles.dateValue}>
-                  {age} yrs
-                </Text>
-              </View>
+      <View key={item.id} style={styles.recordCard}>
+        <Pressable
+          onPress={() =>
+            setExpandedRecordId(isExpanded ? null : item.id)
+          }
+          style={styles.recordSummary}
+        >
+          <View style={styles.recordSummaryText}>
+            <Text style={styles.deceasedName}>{item.deceased_name}</Text>
+            {displayYear ? (
+              <Text style={styles.recordYear}>{displayYear}</Text>
             ) : null}
           </View>
+          <Text style={styles.expandArrow}>{isExpanded ? '⌃' : '⌄'}</Text>
+        </Pressable>
 
-          {/* Burial information */}
-          <View style={styles.infoSection}>
-            <Text style={styles.infoSectionTitle}>
-              BURIAL INFORMATION
-            </Text>
+        {isExpanded ? (
+          <>
+            {/* Grave Photo */}
+            {item.grave_photo_url ? (
+              <Pressable onPress={() => setPreviewPhoto(item.grave_photo_url || null)}>
+                <Image
+                  source={{ uri: item.grave_photo_url }}
+                  style={styles.gravePhoto}
+                  resizeMode="cover"
+                />
+                <Text style={styles.photoPreviewHint}>VIEW PHOTO</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Text style={styles.photoPlaceholderIcon}>🪦</Text>
+                <Text style={styles.photoPlaceholderText}>Grave photo not available</Text>
+              </View>
+            )}
 
-            {item.cemetery_name ? (
-              <InfoRow
-                label="Cemetery"
-                value={item.cemetery_name}
-              />
-            ) : null}
+            <View style={styles.recordContent}>
+              {item.family_name ? (
+                <Text style={styles.familyName}>Family: {item.family_name}</Text>
+              ) : null}
 
-            {item.section ? (
-              <InfoRow
-                label="Section"
-                value={item.section}
-              />
-            ) : null}
+              <View style={styles.dateBox}>
+                {item.date_of_birth ? (
+                  <View style={styles.dateItem}>
+                    <Text style={styles.dateLabel}>BORN</Text>
+                    <Text style={styles.dateValue}>{formatDate(item.date_of_birth)}</Text>
+                  </View>
+                ) : null}
+                {item.date_of_death ? (
+                  <View style={styles.dateItem}>
+                    <Text style={styles.dateLabel}>DIED</Text>
+                    <Text style={styles.dateValue}>{formatDate(item.date_of_death)}</Text>
+                  </View>
+                ) : null}
+                {age !== null ? (
+                  <View style={styles.dateItem}>
+                    <Text style={styles.dateLabel}>AGE</Text>
+                    <Text style={styles.dateValue}>{age} yrs</Text>
+                  </View>
+                ) : null}
+              </View>
 
-            {item.row_name ? (
-              <InfoRow
-                label="Row"
-                value={item.row_name}
-              />
-            ) : null}
+              <View style={styles.infoSection}>
+                <Text style={styles.infoSectionTitle}>BURIAL INFORMATION</Text>
+                {item.cemetery_name ? <InfoRow label="Cemetery" value={item.cemetery_name} /> : null}
+                {item.section ? <InfoRow label="Section" value={item.section} /> : null}
+                {item.row_name ? <InfoRow label="Row" value={item.row_name} /> : null}
+                {item.grave_number ? <InfoRow label="Grave No." value={item.grave_number} highlight /> : null}
+                {item.burial_date ? <InfoRow label="Burial Date" value={formatDate(item.burial_date)} /> : null}
+              </View>
 
-            {item.grave_number ? (
-              <InfoRow
-                label="Grave No."
-                value={item.grave_number}
-                highlight
-              />
-            ) : null}
+              {item.biography ? (
+                <View style={styles.biographyBox}>
+                  <Text style={styles.biographyTitle}>CHANCHIN TAWI</Text>
+                  <Text style={styles.biographyText}>{item.biography}</Text>
+                </View>
+              ) : null}
 
-            {item.burial_date ? (
-              <InfoRow
-                label="Burial Date"
-                value={formatDate(
-                  item.burial_date,
-                )}
-              />
-            ) : null}
-          </View>
+              {item.document_url ? (
+                <Pressable onPress={() => openDocument(item.document_url)} style={styles.documentButton}>
+                  <Text style={styles.documentButtonText}>VIEW OLD RECORD / DOCUMENT</Text>
+                </Pressable>
+              ) : null}
 
-          {/* Biography */}
-          {item.biography ? (
-            <View style={styles.biographyBox}>
-              <Text
-                style={styles.biographyTitle}
-              >
-                CHANCHIN TAWI
-              </Text>
+              {hasLocation ? (
+                <Pressable
+                  onPress={() => openLocation(item.latitude, item.longitude)}
+                  style={styles.locationButton}
+                >
+                  <Text style={styles.locationButtonText}>VIEW GRAVE LOCATION</Text>
+                </Pressable>
+              ) : null}
 
-              <Text
-                style={styles.biographyText}
-              >
-                {item.biography}
-              </Text>
+              {item.notes ? (
+                <View style={styles.notesBox}>
+                  <Text style={styles.notesTitle}>NOTES</Text>
+                  <Text style={styles.notesText}>{item.notes}</Text>
+                </View>
+              ) : null}
             </View>
-          ) : null}
-
-          {/* Location */}
-          {hasLocation ? (
-            <Pressable
-              onPress={() =>
-                openLocation(
-                  item.latitude,
-                  item.longitude,
-                )
-              }
-              style={({ pressed }) => [
-                styles.locationButton,
-                pressed &&
-                  styles.buttonPressed,
-              ]}
-            >
-              <Text
-                style={styles.locationButtonIcon}
-              >
-                📍
-              </Text>
-
-              <View
-                style={
-                  styles.locationButtonContent
-                }
-              >
-                <Text
-                  style={
-                    styles.locationButtonTitle
-                  }
-                >
-                  VIEW GRAVE LOCATION
-                </Text>
-
-                <Text
-                  style={
-                    styles.locationButtonText
-                  }
-                >
-                  Open in Google Maps
-                </Text>
-              </View>
-
-              <Text
-                style={styles.arrow}
-              >
-                ›
-              </Text>
-            </Pressable>
-          ) : null}
-
-          {/* Document */}
-          {item.document_url ? (
-            <Pressable
-              onPress={() =>
-                openDocument(
-                  item.document_url,
-                )
-              }
-              style={({ pressed }) => [
-                styles.documentButton,
-                pressed &&
-                  styles.buttonPressed,
-              ]}
-            >
-              <Text
-                style={
-                  styles.documentButtonIcon
-                }
-              >
-                📄
-              </Text>
-
-              <View
-                style={
-                  styles.documentButtonContent
-                }
-              >
-                <Text
-                  style={
-                    styles.documentButtonTitle
-                  }
-                >
-                  VIEW RECORD DOCUMENT
-                </Text>
-
-                <Text
-                  style={
-                    styles.documentButtonText
-                  }
-                >
-                  Open original record / PDF
-                </Text>
-              </View>
-
-              <Text
-                style={styles.arrow}
-              >
-                ›
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
+          </>
+        ) : null}
       </View>
     );
   }
@@ -677,6 +536,18 @@ export default function CemeteryScreen() {
             </Text>
           </View>
 
+          <Pressable
+            onPress={refresh}
+            disabled={refreshing}
+            style={styles.reloadButton}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.reloadButtonText}>↻ Reload</Text>
+            )}
+          </Pressable>
+
           <View
             style={styles.countBadge}
           >
@@ -738,6 +609,34 @@ export default function CemeteryScreen() {
 
         <View style={styles.bottomSpace} />
       </ScrollView>
+
+      <Modal
+        visible={!!previewPhoto}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewPhoto(null)}
+      >
+        <Pressable
+          style={styles.photoPreviewOverlay}
+          onPress={() => setPreviewPhoto(null)}
+        >
+          <Pressable onPress={(event) => event.stopPropagation()} style={styles.photoPreviewCard}>
+            {previewPhoto ? (
+              <Image
+                source={{ uri: previewPhoto }}
+                style={styles.photoPreviewImage}
+                resizeMode="contain"
+              />
+            ) : null}
+            <Pressable
+              onPress={() => setPreviewPhoto(null)}
+              style={styles.photoPreviewClose}
+            >
+              <Text style={styles.photoPreviewCloseText}>CLOSE</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -972,6 +871,9 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
 
+  reloadButton: { minHeight: 40, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center', marginLeft: 10 },
+  reloadButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+
   resultHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1006,6 +908,33 @@ const styles = StyleSheet.create({
     color: WHITE,
     fontSize: 15,
     fontWeight: '900',
+  },
+
+  recordSummary: {
+    minHeight: 76,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  recordSummaryText: {
+    flex: 1,
+    paddingRight: 10,
+  },
+
+  recordYear: {
+    color: MUTED,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+
+  expandArrow: {
+    color: RED,
+    fontSize: 24,
+    fontWeight: '800',
   },
 
   recordCard: {
@@ -1278,6 +1207,54 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.7,
+  },
+
+  photoPreviewHint: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    color: WHITE,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 8,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+
+  photoPreviewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+
+  photoPreviewCard: {
+    width: '100%',
+    maxWidth: 900,
+    alignItems: 'center',
+  },
+
+  photoPreviewImage: {
+    width: '100%',
+    height: 620,
+  },
+
+  photoPreviewClose: {
+    marginTop: 14,
+    backgroundColor: WHITE,
+    borderRadius: 10,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+  },
+
+  photoPreviewCloseText: {
+    color: TEXT,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
   },
 
   bottomSpace: {

@@ -169,13 +169,12 @@ export default function ActivitiesScreen() {
 
               {item.activity_date ? (
                 <Text style={styles.activityDate}>
-                  {new Date(
-                    item.activity_date
-                  ).toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                  })}
+                  {(() => {
+                    const date = new Date(item.activity_date as string);
+                    return Number.isNaN(date.getTime())
+                      ? ''
+                      : `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+                  })()}
                 </Text>
               ) : null}
 

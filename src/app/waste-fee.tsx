@@ -159,11 +159,7 @@ export default function WasteFeeScreen() {
       return date;
     }
 
-    return d.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   }
 
   function getStatusLabel(status: string) {

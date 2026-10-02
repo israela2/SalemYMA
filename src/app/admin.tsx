@@ -242,23 +242,33 @@ function WebEventDateInput({ value, onChange, mode }: { value: Date | null; onCh
   if (Platform.OS !== 'web') return null;
   const date = value || new Date();
   const inputValue = mode === 'date'
-    ? `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
+    ? `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${date.getFullYear()}`
     : `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
   return React.createElement('input', {
-    type: mode,
+    type: mode === 'date' ? 'text' : 'time',
+    inputMode: mode === 'date' ? 'numeric' : undefined,
+    placeholder: mode === 'date' ? 'DD/MM/YYYY' : undefined,
     value: inputValue,
     onChange: (e: any) => {
       const raw = e?.target?.value;
       if (!raw) return;
       const next = new Date(date);
       if (mode === 'date') {
-        const [y,m,d] = raw.split('-').map(Number);
-        next.setFullYear(y, m-1, d);
+        const digits = raw.replace(/[^0-9]/g, '').slice(0, 8);
+        const formatted = digits.length > 4 ? `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}` : digits.length > 2 ? `${digits.slice(0,2)}/${digits.slice(2)}` : digits;
+        e.target.value = formatted;
+        if (digits.length === 8) {
+          const d = Number(digits.slice(0,2));
+          const m = Number(digits.slice(2,4));
+          const y = Number(digits.slice(4,8));
+          const candidate = new Date(y, m - 1, d, date.getHours(), date.getMinutes(), 0, 0);
+          if (candidate.getFullYear() === y && candidate.getMonth() === m - 1 && candidate.getDate() === d) onChange(candidate);
+        }
       } else {
         const [h,min] = raw.split(':').map(Number);
         next.setHours(h, min, 0, 0);
+        onChange(next);
       }
-      onChange(next);
     },
     style: { width: '100%', minHeight: 44, padding: '10px 12px', border: '1px solid #E5E5E5', borderRadius: 10, fontSize: 15, background: '#FFFFFF', boxSizing: 'border-box' },
   });
@@ -271,11 +281,27 @@ function formatDate(value?: string | null) {
 
   if (Number.isNaN(date.getTime())) return value;
 
-  return date.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
+function normalizeDateInput(value?: string | null) {
+  if (!value) return '';
+  const trimmed = value.trim();
+  const ddmmyyyy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
+  if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+  const yyyymmdd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (yyyymmdd) return trimmed;
+  return trimmed;
+}
+
+function displayDateInput(value?: string | null) {
+  if (!value) return '';
+  const trimmed = value.trim();
+  const ddmmyyyy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
+  if (ddmmyyyy) return trimmed;
+  const yyyymmdd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (yyyymmdd) return `${yyyymmdd[3]}/${yyyymmdd[2]}/${yyyymmdd[1]}`;
+  return formatDate(trimmed) !== '-' ? formatDate(trimmed) : trimmed;
 }
 
 function formatDateTime(value?: string | null) {
@@ -286,11 +312,7 @@ function formatDateTime(value?: string | null) {
   if (Number.isNaN(date.getTime())) return value;
 
   return (
-    date.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    }) +
+    `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}` +
     ' • ' +
     date.toLocaleTimeString('en-IN', {
       hour: '2-digit',
@@ -302,11 +324,7 @@ function formatDateTime(value?: string | null) {
 function formatSelectedDate(date?: Date | null) {
   if (!date) return 'Select event date';
 
-  return date.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
 }
 
 function formatSelectedTime(date?: Date | null) {
@@ -2519,9 +2537,9 @@ export default function AdminScreen() {
   function editCemeteryRecord(item: CemeteryRecord) {
     setEditingCemeteryId(item.id);
     setCemeteryDeceasedName(item.deceased_name || '');
-    setCemeteryDateOfBirth(item.date_of_birth || '');
-    setCemeteryDateOfDeath(item.date_of_death || '');
-    setCemeteryBurialDate(item.burial_date || '');
+    setCemeteryDateOfBirth(displayDateInput(item.date_of_birth));
+    setCemeteryDateOfDeath(displayDateInput(item.date_of_death));
+    setCemeteryBurialDate(displayDateInput(item.burial_date));
     setCemeteryName(item.cemetery_name || 'Salem Cemetery');
     setCemeterySection(item.section || '');
     setCemeteryRowName(item.row_name || '');
@@ -2584,9 +2602,9 @@ export default function AdminScreen() {
 
       const payload = {
         deceased_name: cemeteryDeceasedName.trim(),
-        date_of_birth: cemeteryDateOfBirth.trim() || null,
-        date_of_death: cemeteryDateOfDeath.trim() || null,
-        burial_date: cemeteryBurialDate.trim() || null,
+        date_of_birth: normalizeDateInput(cemeteryDateOfBirth) || null,
+        date_of_death: normalizeDateInput(cemeteryDateOfDeath) || null,
+        burial_date: normalizeDateInput(cemeteryBurialDate) || null,
         cemetery_name: cemeteryName.trim() || 'Salem Cemetery',
         section: cemeterySection.trim() || null,
         row_name: cemeteryRowName.trim() || null,
@@ -2796,9 +2814,9 @@ export default function AdminScreen() {
   function editCemetery(item: CemeteryRecord) {
     setEditingCemeteryId(item.id);
     setCemeteryDeceasedName(item.deceased_name || '');
-    setCemeteryDateOfBirth(item.date_of_birth || '');
-    setCemeteryDateOfDeath(item.date_of_death || '');
-    setCemeteryBurialDate(item.burial_date || '');
+    setCemeteryDateOfBirth(displayDateInput(item.date_of_birth));
+    setCemeteryDateOfDeath(displayDateInput(item.date_of_death));
+    setCemeteryBurialDate(displayDateInput(item.burial_date));
     setCemeteryName(item.cemetery_name || 'Salem Cemetery');
     setCemeterySection(item.section || '');
     setCemeteryRowName(item.row_name || '');
@@ -2892,9 +2910,9 @@ export default function AdminScreen() {
 
       const payload = {
         deceased_name: cemeteryDeceasedName.trim(),
-        date_of_birth: cemeteryDateOfBirth.trim() || null,
-        date_of_death: cemeteryDateOfDeath.trim() || null,
-        burial_date: cemeteryBurialDate.trim() || null,
+        date_of_birth: normalizeDateInput(cemeteryDateOfBirth) || null,
+        date_of_death: normalizeDateInput(cemeteryDateOfDeath) || null,
+        burial_date: normalizeDateInput(cemeteryBurialDate) || null,
         cemetery_name: cemeteryName.trim() || 'Salem Cemetery',
         section: cemeterySection.trim() || null,
         row_name: cemeteryRowName.trim() || null,
@@ -5898,7 +5916,7 @@ export default function AdminScreen() {
               <TextInput
                 value={cemeteryDateOfBirth}
                 onChangeText={setCemeteryDateOfBirth}
-                placeholder="YYYY-MM-DD"
+                placeholder="DD/MM/YYYY"
                 placeholderTextColor="#999999"
                 style={styles.input}
               />
@@ -5907,7 +5925,7 @@ export default function AdminScreen() {
               <TextInput
                 value={cemeteryDateOfDeath}
                 onChangeText={setCemeteryDateOfDeath}
-                placeholder="YYYY-MM-DD"
+                placeholder="DD/MM/YYYY"
                 placeholderTextColor="#999999"
                 style={styles.input}
               />
@@ -5916,7 +5934,7 @@ export default function AdminScreen() {
               <TextInput
                 value={cemeteryBurialDate}
                 onChangeText={setCemeteryBurialDate}
-                placeholder="YYYY-MM-DD"
+                placeholder="DD/MM/YYYY"
                 placeholderTextColor="#999999"
                 style={styles.input}
               />
@@ -6016,10 +6034,12 @@ export default function AdminScreen() {
               </Pressable>
 
               {cemeteryGravePhoto ? (
-                <Image
-                  source={{ uri: cemeteryGravePhoto }}
-                  style={styles.cemeteryFormImage}
-                />
+                <View style={{ gap: 8 }}>
+                  <Image source={{ uri: cemeteryGravePhoto }} style={styles.cemeteryFormImage} />
+                  <Pressable onPress={() => setCemeteryGravePhoto('')} style={styles.outlineButton} disabled={cemeteryPhotoUploading || savingCemetery}>
+                    <Text style={styles.outlineButtonText}>REMOVE GRAVE PHOTO</Text>
+                  </Pressable>
+                </View>
               ) : null}
 
               <Pressable

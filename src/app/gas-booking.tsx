@@ -219,11 +219,7 @@ export default function GasBookingScreen() {
   function formatDate(dateString: string) {
     const date = new Date(dateString);
 
-    return date.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
   }
 
   function getStatusLabel(status: string) {

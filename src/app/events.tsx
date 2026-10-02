@@ -28,24 +28,16 @@ type EventItem = {
 
 function getMonth(dateString: string | null) {
   if (!dateString) return 'TBA';
-
   const date = new Date(dateString);
-
   if (Number.isNaN(date.getTime())) return 'TBA';
-
-  return date
-    .toLocaleDateString('en-US', { month: 'short' })
-    .toUpperCase();
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function getDay(dateString: string | null) {
   if (!dateString) return '--';
-
   const date = new Date(dateString);
-
   if (Number.isNaN(date.getTime())) return '--';
-
-  return String(date.getDate()).padStart(2, '0');
+  return String(date.getFullYear());
 }
 
 function getEventDate(dateString: string | null) {
@@ -57,12 +49,7 @@ function getEventDate(dateString: string | null) {
     return 'Date to be announced';
   }
 
-  return date.toLocaleDateString('en-US', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
 }
 
 function getEventTime(dateString: string | null) {
