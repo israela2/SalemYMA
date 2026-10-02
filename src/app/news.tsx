@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -82,6 +83,13 @@ export default function NewsScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
+          <Pressable
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>‹ Back</Text>
+          </Pressable>
+
           <Text style={styles.headerSmall}>
             YMA SALEM BRANCH
           </Text>
@@ -336,6 +344,23 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     paddingBottom: 20,
+  },
+
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF22',
+    borderWidth: 1,
+    borderColor: '#FFFFFF33',
+  },
+
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
   },
 
   header: {

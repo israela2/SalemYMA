@@ -1,12 +1,18 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
@@ -21,7 +27,15 @@ type WasteBill = {
   paid_at: string | null;
   receipt_no: string | null;
   payment_method: string | null;
+  payment_utr?: string | null;
+  payment_submitted_at?: string | null;
   created_at: string;
+};
+
+type PaymentSettings = {
+  upi_id: string;
+  payee_name: string;
+  instructions?: string | null;
 };
 
 type Member = {
@@ -32,17 +46,26 @@ type Member = {
 
 export default function WasteFeeScreen() {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [bills, setBills] = useState<WasteBill[]>([]);
   const [member, setMember] = useState<Member | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
+  const [selectedBill, setSelectedBill] = useState<WasteBill | null>(null);
+  const [utr, setUtr] = useState('');
+  const [submittingPayment, setSubmittingPayment] = useState(false);
 
   useEffect(() => {
     loadWasteFee();
   }, []);
 
-  async function loadWasteFee() {
+  async function loadWasteFee(isRefresh = false) {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
 
       const {
         data: { user },
@@ -65,6 +88,13 @@ export default function WasteFeeScreen() {
 
       console.log('Current logged-in user:', user.id);
 
+      const { data: paymentConfig } = await supabase
+        .from('waste_payment_settings')
+        .select('upi_id, payee_name, instructions')
+        .eq('id', 1)
+        .maybeSingle();
+      setPaymentSettings(paymentConfig ?? null);
+
       // Load member profile
       const { data: memberData, error: memberError } = await supabase
         .from('members')
@@ -82,7 +112,7 @@ export default function WasteFeeScreen() {
       const { data: billData, error: billError } = await supabase
         .from('waste_bills')
         .select(
-          'id, account_no, bill_month, amount, due_date, status, paid_at, receipt_no, payment_method, created_at'
+          'id, account_no, bill_month, amount, due_date, status, paid_at, receipt_no, payment_method, payment_utr, payment_submitted_at, created_at'
         )
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -100,8 +130,17 @@ export default function WasteFeeScreen() {
       console.log('Waste fee load error:', error);
       setBills([]);
     } finally {
-      setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
+  }
+
+  async function handleRefresh() {
+    if (refreshing) return;
+    await loadWasteFee(true);
   }
 
   function formatAmount(amount: number) {
@@ -171,11 +210,62 @@ export default function WasteFeeScreen() {
   const accountNo =
     bills.find((bill) => bill.account_no)?.account_no || 'YMA-0001';
 
-  function handlePayment() {
-    Alert.alert(
-      'Payment',
-      'Online payment will be available soon. Please contact Salem YMA Branch for payment assistance.'
-    );
+  async function handlePayment(bill: WasteBill) {
+    if (!paymentSettings?.upi_id) {
+      Alert.alert('UPI not configured', 'Admin has not configured the Waste Fee UPI ID yet.');
+      return;
+    }
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(paymentSettings.upi_id)}&pn=${encodeURIComponent(paymentSettings.payee_name || 'Salem YMA')}&am=${encodeURIComponent(Number(bill.amount).toFixed(2))}&cu=INR&tn=${encodeURIComponent(`Waste Fee ${bill.bill_month || ''}`)}`;
+    try {
+      const canOpen = await Linking.canOpenURL(upiUrl);
+      if (canOpen) await Linking.openURL(upiUrl);
+      setSelectedBill(bill);
+    } catch (error: any) {
+      Alert.alert('Unable to open UPI', error?.message || 'Please use the QR code or UPI ID manually.');
+      setSelectedBill(bill);
+    }
+  }
+
+  async function submitUtr() {
+    if (!selectedBill || !userId) return;
+    if (utr.trim().length < 6) {
+      Alert.alert('Enter UTR', 'Please enter the UTR / transaction ID from your UPI payment.');
+      return;
+    }
+    try {
+      setSubmittingPayment(true);
+      const { error } = await supabase.rpc('submit_waste_payment', {
+        p_bill_id: selectedBill.id,
+        p_utr: utr.trim(),
+      });
+      if (error) throw error;
+      Alert.alert('Payment submitted', 'Your UTR has been submitted. Admin will verify the payment and issue your receipt.');
+      setSelectedBill(null);
+      setUtr('');
+      await loadWasteFee();
+    } catch (error: any) {
+      Alert.alert('Submission failed', error?.message || 'Unable to submit payment.');
+    } finally {
+      setSubmittingPayment(false);
+    }
+  }
+
+  async function printReceipt(bill: WasteBill) {
+    const html = `<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="font-family:Arial;padding:28px;color:#111"><h1>SALEM YMA</h1><p>Waste Collection Fee Receipt</p><hr/><p><b>Receipt No:</b> ${bill.receipt_no || '-'}</p><p><b>Member:</b> ${member?.full_name || '-'}</p><p><b>Account:</b> ${bill.account_no || accountNo}</p><p><b>Bill Month:</b> ${bill.bill_month || '-'}</p><p><b>Amount Paid:</b> ₹${Number(bill.amount || 0).toFixed(2)}</p><p><b>Payment Method:</b> ${bill.payment_method || 'UPI'}</p><p><b>UTR:</b> ${bill.payment_utr || '-'}</p><p><b>Paid On:</b> ${formatDate(bill.paid_at || bill.created_at)}</p><hr/><p style="text-align:center">Thank you for supporting a clean community.</p><script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`;
+    try {
+      if (Platform.OS === 'web') {
+        const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+        if (!printWindow) throw new Error('Please allow pop-ups in your browser to print the receipt.');
+        printWindow.document.write(html);
+        printWindow.document.close();
+        return;
+      }
+      const file = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'Save / share receipt' });
+      else await Print.printAsync({ html });
+    } catch (error: any) {
+      Alert.alert('Receipt error', error?.message || 'Unable to create receipt.');
+    }
   }
 
   if (loading) {
@@ -204,8 +294,26 @@ export default function WasteFeeScreen() {
             </Text>
           </View>
 
-          <View style={styles.headerIcon}>
-            <Text style={styles.headerIconText}>₹</Text>
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={handleRefresh}
+              disabled={refreshing}
+              style={({ pressed }) => [
+                styles.refreshButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              {refreshing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.refreshIcon}>↻</Text>
+              )}
+              <Text style={styles.refreshText}>Reload</Text>
+            </Pressable>
+
+            <View style={styles.headerIcon}>
+              <Text style={styles.headerIconText}>₹</Text>
+            </View>
           </View>
         </View>
       </LinearGradient>
@@ -334,9 +442,10 @@ export default function WasteFeeScreen() {
                 <Pressable
                   style={({ pressed }) => [
                     styles.payButton,
+                    (bill.status || '').toLowerCase() === 'pending' && styles.pendingPayButton,
                     pressed && styles.pressed,
                   ]}
-                  onPress={handlePayment}
+                  onPress={() => (bill.status || '').toLowerCase() === 'pending' ? Alert.alert('Payment pending', 'Your UTR has already been submitted. Please wait for admin verification.') : handlePayment(bill)}
                 >
                   <LinearGradient
                     colors={['#C62828', '#8E1B1B']}
@@ -345,7 +454,7 @@ export default function WasteFeeScreen() {
                     style={styles.payButtonGradient}
                   >
                     <Text style={styles.payButtonText}>
-                      Pay Now
+                      {(bill.status || '').toLowerCase() === 'pending' ? 'Payment Verification Pending' : 'Pay with UPI'}
                     </Text>
 
                     <Text style={styles.payButtonArrow}>→</Text>
@@ -394,10 +503,13 @@ export default function WasteFeeScreen() {
                     </Text>
 
                     {bill.receipt_no ? (
-                      <Text style={styles.receiptText}>
-                        Receipt: {bill.receipt_no}
-                      </Text>
+                      <Pressable onPress={() => printReceipt(bill)}>
+                        <Text style={styles.receiptText}>
+                          Receipt: {bill.receipt_no} • VIEW / DOWNLOAD
+                        </Text>
+                      </Pressable>
                     ) : null}
+                    {bill.payment_utr ? <Text style={styles.receiptText}>UTR: {bill.payment_utr}</Text> : null}
                   </View>
 
                   <View style={styles.historyAmountWrap}>
@@ -450,6 +562,26 @@ export default function WasteFeeScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {selectedBill ? (
+        <View style={styles.paymentOverlay}>
+          <View style={styles.paymentModal}>
+            <Text style={styles.paymentModalTitle}>Complete Waste Fee Payment</Text>
+            <Text style={styles.paymentModalAmount}>₹{Number(selectedBill.amount).toFixed(2)}</Text>
+            <Text style={styles.paymentModalLabel}>UPI ID</Text>
+            <Text style={styles.paymentModalUpi}>{paymentSettings?.upi_id || '-'}</Text>
+            {paymentSettings?.upi_id ? <Image source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`upi://pay?pa=${paymentSettings.upi_id}&pn=${paymentSettings.payee_name || 'Salem YMA'}&am=${Number(selectedBill.amount).toFixed(2)}&cu=INR&tn=Waste%20Fee`)}` }} style={styles.paymentQr} /> : null}
+            <Text style={styles.paymentModalHint}>{paymentSettings?.instructions || 'Pay using any UPI app. After successful payment, enter the UTR / transaction ID from the payment confirmation.'}</Text>
+            <TextInput value={utr} onChangeText={setUtr} placeholder="Enter UTR / Transaction ID" placeholderTextColor="#999" style={styles.utrInput} autoCapitalize="characters" />
+            <Pressable onPress={submitUtr} disabled={submittingPayment} style={styles.submitPaymentButton}>
+              {submittingPayment ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitPaymentText}>SUBMIT PAYMENT</Text>}
+            </Pressable>
+            <Pressable onPress={() => { setSelectedBill(null); setUtr(''); }} style={styles.cancelPaymentButton}>
+              <Text style={styles.cancelPaymentText}>CANCEL</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -508,6 +640,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     marginTop: 4,
+  },
+
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  refreshButton: {
+    minWidth: 66,
+    height: 44,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.20)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  refreshIcon: {
+    color: '#FFFFFF',
+    fontSize: 21,
+    lineHeight: 22,
+    fontWeight: '800',
+  },
+
+  refreshText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
+    marginTop: 1,
   },
 
   headerIcon: {
@@ -989,4 +1153,19 @@ const styles = StyleSheet.create({
     fontSize: 9,
     marginTop: 4,
   },
+  pendingPayButton: { opacity: 0.65 },
+  paymentQr: { width: 180, height: 180, alignSelf: 'center', marginTop: 12 },
+  paymentOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  paymentModal: { width: '100%', maxWidth: 430, backgroundColor: '#fff', borderRadius: 22, padding: 22 },
+  paymentModalTitle: { fontSize: 20, fontWeight: '900', color: '#151515' },
+  paymentModalAmount: { fontSize: 30, fontWeight: '900', color: '#C62828', marginTop: 8 },
+  paymentModalLabel: { fontSize: 11, fontWeight: '800', color: '#777', marginTop: 18 },
+  paymentModalUpi: { fontSize: 16, fontWeight: '800', color: '#151515', marginTop: 4 },
+  paymentModalHint: { fontSize: 13, lineHeight: 19, color: '#666', marginTop: 12 },
+  utrInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, marginTop: 16, fontSize: 15, color: '#111' },
+  submitPaymentButton: { backgroundColor: '#C62828', borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+  submitPaymentText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  cancelPaymentButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 5 },
+  cancelPaymentText: { color: '#777', fontWeight: '800', fontSize: 12 },
+
 });

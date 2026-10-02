@@ -1,9 +1,11 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Linking,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -25,20 +27,76 @@ type BranchLeader = {
   is_active: boolean;
 };
 
+type SectionLeader = {
+  id: number;
+  section: string;
+  position: string;
+  full_name: string;
+  phone: string | null;
+  photo_url: string | null;
+  display_order: number;
+  is_active: boolean;
+};
+
 const leaderOrder = [
   'President',
   'Vice President',
   'Secretary',
   'Assistant Secretary',
   'Treasurer',
-  'Assistant Treasurer',
+  'Financial Secretary',
+];
+
+const sectionNames = [
+  'Section I',
+  'Section II',
+  'Section III',
 ];
 
 const branchMapUrl =
   'https://maps.app.goo.gl/nZCj2FfrCNDXDQfd7';
 
+const legacyBranchPositionMap: Record<string, string> = {
+  Leader: 'President',
+  'Assistant Leader': 'Vice President',
+  President: 'President',
+  'Vice President': 'Vice President',
+  Secretary: 'Secretary',
+  'Assistant Secretary': 'Assistant Secretary',
+  Treasurer: 'Treasurer',
+  'Assistant Treasurer': 'Financial Secretary',
+  'Finance Secretary': 'Financial Secretary',
+  'Financial Secretary': 'Financial Secretary',
+};
+
+function normalizeBranchLeader(leader: BranchLeader): BranchLeader {
+  return {
+    ...leader,
+    position: legacyBranchPositionMap[leader.position] ?? leader.position,
+  };
+}
+
+const legacySectionPositionMap: Record<string, string> = {
+  President: 'Leader',
+  'Vice President': 'Assistant Leader',
+  Secretary: 'Secretary',
+  'Assistant Secretary': 'Assistant Secretary',
+  Treasurer: 'Treasurer',
+  'Assistant Treasurer': 'Finance Secretary',
+};
+
+function normalizeSectionLeader(leader: SectionLeader): SectionLeader {
+  return {
+    ...leader,
+    position:
+      legacySectionPositionMap[leader.position] ?? leader.position,
+  };
+}
+
 export default function BranchesScreen() {
   const [leaders, setLeaders] = useState<BranchLeader[]>([]);
+  const [sectionLeaders, setSectionLeaders] = useState<SectionLeader[]>([]);
+  const [selectedSection, setSelectedSection] = useState('Section I');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -50,24 +108,57 @@ export default function BranchesScreen() {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from('branch_leaders')
-        .select(
-          'id, position, full_name, phone, photo_url, display_order, is_active'
-        )
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
+      const [branchResult, sectionResult] = await Promise.all([
+        supabase
+          .from('branch_leaders')
+          .select(
+            'id, position, full_name, phone, photo_url, display_order, is_active'
+          )
+          .eq('is_active', true)
+          .order('display_order', { ascending: true }),
 
-      if (error) {
-        console.log('Branch leaders error:', error);
+        supabase
+          .from('section_leaders')
+          .select(
+            'id, section, position, full_name, phone, photo_url, display_order, is_active'
+          )
+          .eq('is_active', true)
+          .order('section', { ascending: true })
+          .order('display_order', { ascending: true }),
+      ]);
+
+      if (branchResult.error) {
+        console.log(
+          'Branch leaders error:',
+          branchResult.error
+        );
         setLeaders([]);
-        return;
+      } else {
+        setLeaders(
+          ((branchResult.data ?? []) as BranchLeader[]).map(normalizeBranchLeader)
+        );
       }
 
-      setLeaders((data ?? []) as BranchLeader[]);
+      if (sectionResult.error) {
+        console.log(
+          'Section leaders error:',
+          sectionResult.error
+        );
+        setSectionLeaders([]);
+      } else {
+        setSectionLeaders(
+          (sectionResult.data ?? [])
+            .map((leader) => normalizeSectionLeader(leader as SectionLeader))
+        );
+      }
     } catch (error) {
-      console.log('Load branch leaders error:', error);
+      console.log(
+        'Load branch leaders error:',
+        error
+      );
+
       setLeaders([]);
+      setSectionLeaders([]);
     } finally {
       setLoading(false);
     }
@@ -87,51 +178,44 @@ export default function BranchesScreen() {
     try {
       await Linking.openURL(branchMapUrl);
     } catch (error) {
-      console.log('Google Maps error:', error);
+      console.log(
+        'Google Maps error:',
+        error
+      );
     }
   }
 
   function getLeader(position: string) {
     return leaders.find(
       (leader) =>
-        leader.position.toLowerCase() === position.toLowerCase()
+        leader.position.toLowerCase() ===
+        position.toLowerCase()
     );
   }
 
   function getPositionLabel(position: string) {
-    switch (position) {
-      case 'President':
-        return 'BRANCH PRESIDENT';
-
-      case 'Vice President':
-        return 'BRANCH VICE PRESIDENT';
-
-      case 'Secretary':
-        return 'BRANCH SECRETARY';
-
-      case 'Assistant Secretary':
-        return 'ASSISTANT SECRETARY';
-
-      case 'Treasurer':
-        return 'BRANCH TREASURER';
-
-      case 'Assistant Treasurer':
-        return 'ASSISTANT TREASURER';
-
-      default:
-        return position.toUpperCase();
-    }
+    return position.toUpperCase();
   }
 
-  async function callLeader(phone: string | null) {
+  async function callLeader(
+    phone: string | null
+  ) {
     if (!phone) return;
 
-    const cleanPhone = phone.replace(/\s+/g, '');
+    const cleanPhone = phone.replace(
+      /\s+/g,
+      ''
+    );
 
     try {
-      await Linking.openURL(`tel:${cleanPhone}`);
+      await Linking.openURL(
+        `tel:${cleanPhone}`
+      );
     } catch (error) {
-      console.log('Call error:', error);
+      console.log(
+        'Call error:',
+        error
+      );
     }
   }
 
@@ -147,13 +231,19 @@ export default function BranchesScreen() {
         <View style={styles.photoWrapper}>
           {leader?.photo_url ? (
             <Image
-              source={{ uri: leader.photo_url }}
+              source={{
+                uri: leader.photo_url,
+              }}
               style={styles.leaderPhoto}
               resizeMode="cover"
             />
           ) : (
             <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoPlaceholderText}>
+              <Text
+                style={
+                  styles.photoPlaceholderText
+                }
+              >
                 👤
               </Text>
             </View>
@@ -188,14 +278,100 @@ export default function BranchesScreen() {
               styles.callButton,
               pressed && styles.pressed,
             ]}
-            onPress={() => callLeader(leader.phone)}
+            onPress={() =>
+              callLeader(leader.phone)
+            }
           >
-            <Text style={styles.callIcon}>☎</Text>
+            <Text style={styles.callIcon}>
+              ☎
+            </Text>
           </Pressable>
         ) : null}
       </View>
     );
   }
+
+  function SectionLeaderCard({
+    leader,
+  }: {
+    leader: SectionLeader;
+  }) {
+    return (
+      <View style={styles.sectionLeaderCard}>
+        <View style={styles.photoWrapper}>
+          {leader.photo_url ? (
+            <Image
+              source={{
+                uri: leader.photo_url,
+              }}
+              style={styles.leaderPhoto}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.photoPlaceholder}>
+              <Text
+                style={
+                  styles.photoPlaceholderText
+                }
+              >
+                👤
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.leaderInfo}>
+          <Text style={styles.role}>
+            {leader.position.toUpperCase()}
+          </Text>
+
+          <Text style={styles.leaderName}>
+            {leader.full_name?.trim()
+              ? leader.full_name
+              : 'Name not updated'}
+          </Text>
+
+          {leader.phone ? (
+            <Text style={styles.phone}>
+              📞 {leader.phone}
+            </Text>
+          ) : (
+            <Text style={styles.phoneMuted}>
+              Phone number not updated
+            </Text>
+          )}
+        </View>
+
+        {leader.phone ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.callButton,
+              pressed && styles.pressed,
+            ]}
+            onPress={() =>
+              callLeader(leader.phone)
+            }
+          >
+            <Text style={styles.callIcon}>
+              ☎
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  }
+
+  const selectedSectionLeaders =
+    sectionLeaders
+      .filter(
+        (leader) =>
+          leader.section === selectedSection
+      )
+      .sort(
+        (a, b) =>
+          a.display_order -
+          b.display_order
+      );
 
   return (
     <ScrollView
@@ -212,11 +388,26 @@ export default function BranchesScreen() {
     >
       {/* Header */}
       <LinearGradient
-        colors={['#D32F2F', '#8E1B1B', '#0B0B0B']}
+        colors={[
+          '#D32F2F',
+          '#8E1B1B',
+          '#0B0B0B',
+        ]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text
+            style={styles.backButtonText}
+          >
+            ‹ Back
+          </Text>
+        </Pressable>
+
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.headerSmall}>
@@ -233,7 +424,9 @@ export default function BranchesScreen() {
           </View>
 
           <View style={styles.headerIcon}>
-            <Text style={styles.headerIconText}>
+            <Text
+              style={styles.headerIconText}
+            >
               SY
             </Text>
           </View>
@@ -243,7 +436,11 @@ export default function BranchesScreen() {
       {/* Branch Overview */}
       <View style={styles.branchCard}>
         <LinearGradient
-          colors={['#D32F2F', '#8E1B1B', '#0B0B0B']}
+          colors={[
+            '#D32F2F',
+            '#8E1B1B',
+            '#0B0B0B',
+          ]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.logoCircle}
@@ -282,7 +479,9 @@ export default function BranchesScreen() {
           </Text>
         </View>
 
-        <View style={styles.sectionHeaderRight}>
+        <View
+          style={styles.sectionHeaderRight}
+        >
           <Pressable
             style={({ pressed }) => [
               styles.reloadButton,
@@ -296,12 +495,18 @@ export default function BranchesScreen() {
             </Text>
 
             <Text style={styles.reloadText}>
-              {refreshing ? 'Loading' : 'Reload'}
+              {refreshing
+                ? 'Loading'
+                : 'Reload'}
             </Text>
           </Pressable>
 
           <View style={styles.leaderCount}>
-            <Text style={styles.leaderCountText}>
+            <Text
+              style={
+                styles.leaderCountText
+              }
+            >
               {leaders.length}
             </Text>
           </View>
@@ -328,8 +533,146 @@ export default function BranchesScreen() {
         ))
       )}
 
+      {/* Section Hruaitute */}
+      <View
+        style={[
+          styles.sectionHeader,
+          styles.sectionLeadersHeader,
+        ]}
+      >
+        <View style={styles.sectionHeaderLeft}>
+          <Text style={styles.sectionTitle}>
+            Section Hruaitute
+          </Text>
+
+          <Text style={styles.sectionSubtitle}>
+            Section hrang hrangah hruaitu 6-te
+          </Text>
+        </View>
+      </View>
+
+      {/* Section Tabs */}
+      <View style={styles.sectionTabs}>
+        {sectionNames.map(
+          (sectionName) => {
+            const isSelected =
+              selectedSection ===
+              sectionName;
+
+            return (
+              <Pressable
+                key={sectionName}
+                style={[
+                  styles.sectionTab,
+                  isSelected &&
+                    styles.sectionTabActive,
+                ]}
+                onPress={() =>
+                  setSelectedSection(
+                    sectionName
+                  )
+                }
+              >
+                <Text
+                  style={[
+                    styles.sectionTabText,
+                    isSelected &&
+                      styles.sectionTabTextActive,
+                  ]}
+                >
+                  {sectionName}
+                </Text>
+              </Pressable>
+            );
+          }
+        )}
+      </View>
+
+      {/* Selected Section */}
+      <View style={styles.selectedSectionCard}>
+        <View
+          style={styles.selectedSectionHeader}
+        >
+          <View>
+            <Text
+              style={
+                styles.selectedSectionTitle
+              }
+            >
+              {selectedSection}
+            </Text>
+
+            <Text
+              style={
+                styles.selectedSectionSubtitle
+              }
+            >
+              Section Hruaitu 6-te
+            </Text>
+          </View>
+
+          <View
+            style={
+              styles.selectedSectionCount
+            }
+          >
+            <Text
+              style={
+                styles.selectedSectionCountText
+              }
+            >
+              {selectedSectionLeaders.length}/6
+            </Text>
+          </View>
+        </View>
+
+        {selectedSectionLeaders.length >
+        0 ? (
+          selectedSectionLeaders.map(
+            (leader) => (
+              <SectionLeaderCard
+                key={leader.id}
+                leader={leader}
+              />
+            )
+          )
+        ) : (
+          <View
+            style={styles.emptySection}
+          >
+            <Text
+              style={
+                styles.emptySectionIcon
+              }
+            >
+              👥
+            </Text>
+
+            <Text
+              style={
+                styles.emptySectionTitle
+              }
+            >
+              No section hruaitu yet
+            </Text>
+
+            <Text
+              style={
+                styles.emptySectionText
+              }
+            >
+              {selectedSection} hruaitu 6-te
+              admin system hmangin dah
+              theih an ni.
+            </Text>
+          </View>
+        )}
+      </View>
+
       {/* Branch Activities */}
-      <Text style={styles.sectionTitleStandalone}>
+      <Text
+        style={styles.sectionTitleStandalone}
+      >
         Branch Hmalakna
       </Text>
 
@@ -346,15 +689,18 @@ export default function BranchesScreen() {
           </Text>
 
           <Text style={styles.infoText}>
-            Branch hmalakna, community service,
-            programme leh member activity te
-            hetah hian kan dah ang.
+            Branch hmalakna, community
+            service, programme leh member
+            activity te hetah hian kan dah
+            ang.
           </Text>
         </View>
       </View>
 
       {/* Contact & Location */}
-      <Text style={styles.sectionTitleStandalone}>
+      <Text
+        style={styles.sectionTitleStandalone}
+      >
         Contact & Location
       </Text>
 
@@ -380,42 +726,53 @@ export default function BranchesScreen() {
       <View style={styles.mapCard}>
         <View style={styles.mapHeader}>
           <View style={styles.mapHeaderIcon}>
-            <Text style={styles.mapHeaderIconText}>
+            <Text
+              style={
+                styles.mapHeaderIconText
+              }
+            >
               📍
             </Text>
           </View>
 
-          <View style={styles.mapHeaderContent}>
+          <View
+            style={styles.mapHeaderContent}
+          >
             <Text style={styles.mapTitle}>
               Salem YMA Branch Location
             </Text>
 
-            <Text style={styles.mapSubtitle}>
+            <Text
+              style={styles.mapSubtitle}
+            >
               Salem, Mizoram
             </Text>
           </View>
         </View>
 
         <View style={styles.mapWrapper}>
-          <WebView
-            source={{ uri: branchMapUrl }}
-            style={styles.map}
-            javaScriptEnabled
-            domStorageEnabled
-            startInLoadingState
-            renderLoading={() => (
-              <View style={styles.mapLoading}>
-                <ActivityIndicator
-                  size="small"
-                  color="#C62828"
-                />
-
-                <Text style={styles.mapLoadingText}>
-                  Loading map...
-                </Text>
-              </View>
-            )}
-          />
+          {Platform.OS === 'web' ? (
+            <iframe
+              title="Salem YMA Branch Location"
+              src={branchMapUrl}
+              style={styles.webMap as any}
+              loading="lazy"
+            />
+          ) : (
+            <WebView
+              source={{ uri: branchMapUrl }}
+              style={styles.map}
+              javaScriptEnabled
+              domStorageEnabled
+              startInLoadingState
+              renderLoading={() => (
+                <View style={styles.mapLoading}>
+                  <ActivityIndicator size="small" color="#C62828" />
+                  <Text style={styles.mapLoadingText}>Loading map...</Text>
+                </View>
+              )}
+            />
+          )}
         </View>
 
         <Pressable
@@ -448,8 +805,9 @@ export default function BranchesScreen() {
           </Text>
 
           <Text style={styles.contactText}>
-            Salem YMA Branch contact information
-            will be updated through the admin system.
+            Salem YMA Branch contact
+            information will be updated
+            through the admin system.
           </Text>
         </View>
       </View>
@@ -467,18 +825,22 @@ export default function BranchesScreen() {
           </Text>
 
           <Text style={styles.contactText}>
-            Branch information will be maintained
-            through the Salem YMA administration.
+            Branch information will be
+            maintained through the Salem
+            YMA administration.
           </Text>
         </View>
       </View>
 
+      {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerTitle}>
           SALEM YMA
         </Text>
 
-        <Text style={styles.footerSubtitle}>
+        <Text
+          style={styles.footerSubtitle}
+        >
           Young Mizo Association
         </Text>
       </View>
@@ -492,6 +854,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+  },
+
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF22',
+    borderWidth: 1,
+    borderColor: '#FFFFFF33',
+  },
+
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
   },
 
   header: {
@@ -532,9 +911,11 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor:
+      'rgba(255,255,255,0.14)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor:
+      'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -618,6 +999,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+
+  sectionLeadersHeader: {
+    marginTop: 8,
   },
 
   sectionHeaderLeft: {
@@ -716,6 +1101,24 @@ const styles = StyleSheet.create({
     },
   },
 
+  sectionLeaderCard: {
+    marginHorizontal: 12,
+    marginBottom: 10,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOpacity: 0.06,
+    shadowRadius: 7,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+  },
+
   photoWrapper: {
     width: 68,
     height: 68,
@@ -791,6 +1194,113 @@ const styles = StyleSheet.create({
 
   pressed: {
     opacity: 0.7,
+  },
+
+  /* SECTION TABS */
+
+  sectionTabs: {
+    marginHorizontal: 18,
+    marginBottom: 14,
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  sectionTab: {
+    flex: 1,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  sectionTabActive: {
+    backgroundColor: '#C62828',
+    borderColor: '#C62828',
+  },
+
+  sectionTabText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#666666',
+  },
+
+  sectionTabTextActive: {
+    color: '#FFFFFF',
+  },
+
+  selectedSectionCard: {
+    marginHorizontal: 18,
+    marginBottom: 18,
+    paddingTop: 14,
+    paddingBottom: 4,
+    borderRadius: 18,
+    backgroundColor: '#F8F8F8',
+  },
+
+  selectedSectionHeader: {
+    marginHorizontal: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  selectedSectionTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#151515',
+  },
+
+  selectedSectionSubtitle: {
+    fontSize: 9,
+    color: '#888888',
+    marginTop: 3,
+  },
+
+  selectedSectionCount: {
+    backgroundColor: '#FBEAEA',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+
+  selectedSectionCountText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#C62828',
+  },
+
+  emptySection: {
+    marginHorizontal: 12,
+    marginBottom: 12,
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  emptySectionIcon: {
+    fontSize: 30,
+    marginBottom: 8,
+  },
+
+  emptySectionTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#333333',
+  },
+
+  emptySectionText: {
+    marginTop: 5,
+    fontSize: 10,
+    color: '#999999',
+    textAlign: 'center',
+    lineHeight: 15,
   },
 
   sectionTitleStandalone: {
@@ -903,6 +1413,8 @@ const styles = StyleSheet.create({
     color: '#777777',
     marginTop: 3,
   },
+
+  webMap: { width: '100%', height: '100%', borderWidth: 0 },
 
   mapWrapper: {
     height: 260,

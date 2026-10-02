@@ -4,6 +4,7 @@ import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -12,6 +13,7 @@ import {
   Image,
   Pressable,
   RefreshControl,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -77,8 +79,12 @@ type WasteBill = {
   paid_at?: string | null;
   receipt_no?: string | null;
   payment_method?: string | null;
+  payment_utr?: string | null;
+  payment_submitted_at?: string | null;
   created_at?: string | null;
 };
+
+type WastePaymentSettings = { id: number; upi_id: string; payee_name: string; instructions?: string | null; };
 
 type GasBooking = {
   id: number;
@@ -90,6 +96,15 @@ type GasBooking = {
   status: string;
   created_at: string;
   updated_at?: string;
+};
+
+type GasBookingArchive = GasBooking & {
+  archived_at: string;
+};
+
+type GasArchiveGroup = {
+  monthKey: string;
+  round: number;
 };
 
 type ZonunItem = {
@@ -112,14 +127,43 @@ type AdminAccount = {
 };
 
 type BranchLeader = {
-  id: number;
-  position: string;
-  full_name: string;
-  phone?: string | null;
-  photo_url?: string | null;
-  display_order: number;
-  is_active: boolean;
+  id: number; position: string; full_name: string; phone?: string | null; photo_url?: string | null; display_order: number; is_active: boolean;
 };
+type SectionLeader = {
+  id: number; section: string; position: string; full_name: string; phone?: string | null; photo_url?: string | null; display_order: number; is_active: boolean;
+};
+const LEGACY_BRANCH_POSITION_MAP: Record<string, string> = {
+  Leader: 'President',
+  'Assistant Leader': 'Vice President',
+  President: 'President',
+  'Vice President': 'Vice President',
+  Secretary: 'Secretary',
+  'Assistant Secretary': 'Assistant Secretary',
+  Treasurer: 'Treasurer',
+  'Assistant Treasurer': 'Financial Secretary',
+  'Finance Secretary': 'Financial Secretary',
+  'Financial Secretary': 'Financial Secretary',
+};
+
+function normalizeBranchLeaderPosition(position: string) {
+  return LEGACY_BRANCH_POSITION_MAP[position] ?? position;
+}
+
+const SECTION_NAMES = ['Section I', 'Section II', 'Section III'];
+const SECTION_LEADER_POSITIONS = ['Leader','Assistant Leader','Secretary','Assistant Secretary','Treasurer','Finance Secretary'];
+const LEGACY_SECTION_POSITION_MAP: Record<string, string> = {
+  President: 'Leader',
+  'Vice President': 'Assistant Leader',
+  Secretary: 'Secretary',
+  'Assistant Secretary': 'Assistant Secretary',
+  Treasurer: 'Treasurer',
+  'Assistant Treasurer': 'Finance Secretary',
+};
+
+function normalizeSectionLeaderPosition(position: string) {
+  return LEGACY_SECTION_POSITION_MAP[position] ?? position;
+}
+
 
 type CemeteryRecord = {
   id: number;
@@ -151,7 +195,7 @@ const BRANCH_LEADER_POSITIONS = [
   'Secretary',
   'Assistant Secretary',
   'Treasurer',
-  'Assistant Treasurer',
+  'Financial Secretary',
 ];
 
 const RED = '#C62828';
@@ -378,9 +422,24 @@ export default function AdminScreen() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [wasteBills, setWasteBills] = useState<WasteBill[]>([]);
+  const [wastePaymentSettings, setWastePaymentSettings] = useState<WastePaymentSettings | null>(null);
+  const [wasteUpiId, setWasteUpiId] = useState('');
+  const [wastePayeeName, setWastePayeeName] = useState('Salem YMA');
+  const [wastePaymentInstructions, setWastePaymentInstructions] = useState('Pay using any UPI app and submit the UTR after payment.');
+  const [savingWastePaymentSettings, setSavingWastePaymentSettings] = useState(false);
   const [zonun, setZonun] = useState<ZonunItem[]>([]);
 
   const [branchLeaders, setBranchLeaders] = useState<BranchLeader[]>([]);
+  const [sectionLeaders, setSectionLeaders] = useState<SectionLeader[]>([]);
+  const [sectionLeaderSection, setSectionLeaderSection] = useState('Section I');
+  const [sectionLeaderPosition, setSectionLeaderPosition] = useState('Leader');
+  const [sectionLeaderFullName, setSectionLeaderFullName] = useState('');
+  const [sectionLeaderPhone, setSectionLeaderPhone] = useState('');
+  const [sectionLeaderPhoto, setSectionLeaderPhoto] = useState('');
+  const [sectionLeaderDisplayOrder, setSectionLeaderDisplayOrder] = useState('1');
+  const [sectionLeaderActive, setSectionLeaderActive] = useState(true);
+  const [editingSectionLeaderId, setEditingSectionLeaderId] = useState<number | null>(null);
+  const [savingSectionLeader, setSavingSectionLeader] = useState(false);
 
   const [cemeteryRecords, setCemeteryRecords] =
     useState<CemeteryRecord[]>([]);
@@ -421,6 +480,9 @@ export default function AdminScreen() {
   const [gasBookings, setGasBookings] = useState<GasBooking[]>([]);
   const [loadingGasBookings, setLoadingGasBookings] =
     useState(false);
+  const [gasBookingArchive, setGasBookingArchive] = useState<GasBookingArchive[]>([]);
+  const [loadingGasArchive, setLoadingGasArchive] = useState(false);
+  const [selectedGasArchiveDate, setSelectedGasArchiveDate] = useState<string | null>(null);
 
   const [memberSearch, setMemberSearch] = useState('');
 
@@ -462,6 +524,9 @@ export default function AdminScreen() {
   const [wasteDueDate, setWasteDueDate] = useState('');
   const [wasteStatus, setWasteStatus] =
     useState('unpaid');
+  const [bulkWasteAmount, setBulkWasteAmount] = useState('200');
+  const [bulkWasteBillMonth, setBulkWasteBillMonth] = useState('');
+  const [creatingAllWasteBills, setCreatingAllWasteBills] = useState(false);
   const [savingWasteBill, setSavingWasteBill] =
     useState(false);
 
@@ -482,6 +547,7 @@ export default function AdminScreen() {
     | 'waste'
     | 'zonun'
     | 'leaders'
+    | 'section-leaders'
     | 'cemetery'
     | 'gas'
     | 'admins'
@@ -840,6 +906,164 @@ export default function AdminScreen() {
     }
   }
 
+  async function loadGasBookingArchive() {
+    setLoadingGasArchive(true);
+    try {
+      const { data, error } = await supabase
+        .from('gas_booking_archive')
+        .select('id, user_id, full_name, phone, address, cylinder_quantity, status, created_at, updated_at, archived_at')
+        .order('archived_at', { ascending: false });
+
+      if (error) throw error;
+      setGasBookingArchive((data ?? []) as GasBookingArchive[]);
+    } catch (error: any) {
+      console.log('Gas booking archive load error:', error?.message || error);
+      setGasBookingArchive([]);
+    } finally {
+      setLoadingGasArchive(false);
+    }
+  }
+
+  async function deleteAllGasBookings() {
+    if (gasBookings.length === 0) {
+      Alert.alert('No bookings', 'There are no active gas bookings to delete.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete ALL gas bookings?',
+      `This will remove all ${gasBookings.length} booking(s) from the active list. Member accounts will NOT be deleted. A history copy of every booking will be kept for the Gas Booking History PDF.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'DELETE ALL BOOKINGS',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const archivedAt = new Date().toISOString();
+              const archiveRows = gasBookings.map((booking) => ({
+                id: booking.id,
+                user_id: booking.user_id,
+                full_name: booking.full_name,
+                phone: booking.phone,
+                address: booking.address,
+                cylinder_quantity: booking.cylinder_quantity,
+                status: booking.status,
+                created_at: booking.created_at,
+                updated_at: booking.updated_at ?? null,
+                archived_at: archivedAt,
+              }));
+
+              const { error: archiveError } = await supabase
+                .from('gas_booking_archive')
+                .upsert(archiveRows, { onConflict: 'id' });
+
+              if (archiveError) throw archiveError;
+
+              const { error: deleteError } = await supabase
+                .from('gas_bookings')
+                .delete()
+                .in('id', gasBookings.map((booking) => booking.id));
+
+              if (deleteError) throw deleteError;
+
+              await loadGasBookings();
+              await loadGasBookingArchive();
+              Alert.alert(
+                'All bookings deleted',
+                'All active gas bookings were removed. Member accounts are unchanged, and the bookings are preserved in Gas Booking History.',
+              );
+            } catch (error: any) {
+              Alert.alert(
+                'Delete failed',
+                error?.message || 'Unable to delete all gas bookings.',
+              );
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  function getGasArchiveDateKey(value: string) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  const gasArchiveDates = useMemo(() => {
+    const dates = Array.from(
+      new Set(gasBookingArchive.map((booking) => getGasArchiveDateKey(booking.archived_at))),
+    );
+    return dates.sort((a, b) => b.localeCompare(a));
+  }, [gasBookingArchive]);
+
+  const selectedGasArchiveBookings = useMemo(() => {
+    if (!selectedGasArchiveDate) return gasBookingArchive;
+    return gasBookingArchive.filter(
+      (booking) => getGasArchiveDateKey(booking.archived_at) === selectedGasArchiveDate,
+    );
+  }, [gasBookingArchive, selectedGasArchiveDate]);
+
+  async function printGasBookingArchive() {
+    const records = selectedGasArchiveBookings;
+    if (records.length === 0) {
+      Alert.alert('No history', 'There are no archived gas bookings for the selected deleted date.');
+      return;
+    }
+
+    try {
+      const rows = records.map((booking, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(booking.full_name)}</td>
+          <td>${escapeHtml(booking.phone)}</td>
+          <td>${escapeHtml(booking.address || '-')}</td>
+          <td>${booking.cylinder_quantity}</td>
+        </tr>`).join('');
+
+      const selectedLabel = selectedGasArchiveDate
+        ? formatDate(`${selectedGasArchiveDate}T00:00:00`)
+        : 'All deleted dates';
+
+      const html = `
+        <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+          @page { size: A4 landscape; margin: 18px; }
+          body { font-family: Arial, sans-serif; padding: 10px; color: #111; }
+          h1 { color: #C62828; margin: 0; font-size: 24px; }
+          h2 { margin: 3px 0 0; font-size: 16px; }
+          .subtitle { color: #555; margin: 6px 0 18px; font-size: 11px; }
+          table { width: 100%; border-collapse: collapse; font-size: 9px; }
+          th, td { border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top; }
+          th { background: #C62828; color: white; }
+          tr:nth-child(even) { background: #f7f7f7; }
+          .footer { margin-top: 18px; font-size: 9px; color: #777; border-top: 1px solid #ddd; padding-top: 8px; }
+        </style></head><body>
+          <h1>SALEM YMA</h1>
+          <h2>Gas Booking History / Archive</h2>
+          <div class="subtitle">Gas Booking Deleted Date: ${escapeHtml(selectedLabel)} &nbsp; • &nbsp; Deleted Bookings: ${records.length}</div>
+          <table><thead><tr><th>No.</th><th>Booker Name</th><th>Phone Number</th><th>Address</th><th>Gas Booked</th></tr></thead>
+          <tbody>${rows}</tbody></table>
+          <div class="footer">SALEM YMA • GAS BOOKING HISTORY • Deleted booking records are retained for reference.</div>
+        </body></html>`;
+
+      if (Platform.OS === 'web') {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) throw new Error('Please allow pop-ups in your browser to print.');
+        printWindow.document.write(`${html.replace('</body>', '<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body>')}`);
+        printWindow.document.close();
+      } else {
+        await Print.printAsync({ html });
+      }
+    } catch (error: any) {
+      Alert.alert('Print failed', error?.message || 'Unable to open the history print preview.');
+    }
+  }
+
   async function loadAll() {
     try {
       const {
@@ -916,6 +1140,7 @@ export default function AdminScreen() {
         wasteBillsResult,
         zonunResult,
         branchLeadersResult,
+        sectionLeadersResult,
         cemeteryResult,
         gasBookingsResult,
       ] = await Promise.all([
@@ -964,6 +1189,12 @@ export default function AdminScreen() {
         supabase
           .from('branch_leaders')
           .select('id, position, full_name, phone, photo_url, display_order, is_active')
+          .order('display_order', { ascending: true }),
+
+        supabase
+          .from('section_leaders')
+          .select('id, section, position, full_name, phone, photo_url, display_order, is_active')
+          .order('section', { ascending: true })
           .order('display_order', { ascending: true }),
 
         supabase
@@ -1027,7 +1258,10 @@ export default function AdminScreen() {
 
       if (!branchLeadersResult.error) {
         setBranchLeaders(
-          (branchLeadersResult.data || []) as BranchLeader[],
+          ((branchLeadersResult.data || []) as BranchLeader[]).map((item) => ({
+            ...item,
+            position: normalizeBranchLeaderPosition(item.position),
+          })),
         );
       } else {
         console.log(
@@ -1035,6 +1269,18 @@ export default function AdminScreen() {
           branchLeadersResult.error.message,
         );
         setBranchLeaders([]);
+      }
+
+      if (!sectionLeadersResult.error) {
+        setSectionLeaders(
+          (sectionLeadersResult.data || []).map((item) => ({
+            ...(item as SectionLeader),
+            position: normalizeSectionLeaderPosition((item as SectionLeader).position),
+          })),
+        );
+      } else {
+        console.log('Section leaders load error:', sectionLeadersResult.error.message);
+        setSectionLeaders([]);
       }
 
       if (!cemeteryResult.error) {
@@ -1061,6 +1307,19 @@ export default function AdminScreen() {
         );
 
         setGasBookings([]);
+      }
+
+      const { data: paymentSettings } = await supabase
+        .from('waste_payment_settings')
+        .select('id, upi_id, payee_name, instructions')
+        .eq('id', 1)
+        .maybeSingle();
+      if (paymentSettings) {
+        const settings = paymentSettings as WastePaymentSettings;
+        setWastePaymentSettings(settings);
+        setWasteUpiId(settings.upi_id || '');
+        setWastePayeeName(settings.payee_name || 'Salem YMA');
+        setWastePaymentInstructions(settings.instructions || 'Pay using any UPI app and submit the UTR after payment.');
       }
 
       await loadAdminRequests(adminAccount.role);
@@ -1651,6 +1910,37 @@ export default function AdminScreen() {
     );
   }
 
+  async function saveWastePaymentSettings() {
+    if (!wasteUpiId.trim() || !wasteUpiId.includes('@')) {
+      Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID such as example@upi.'); return;
+    }
+    try {
+      setSavingWastePaymentSettings(true);
+      const { data, error } = await supabase.from('waste_payment_settings').upsert({ id: 1, upi_id: wasteUpiId.trim(), payee_name: wastePayeeName.trim() || 'Salem YMA', instructions: wastePaymentInstructions.trim() || null, updated_at: new Date().toISOString() }, { onConflict: 'id' }).select('id, upi_id, payee_name, instructions').single();
+      if (error) throw error;
+      setWastePaymentSettings(data as WastePaymentSettings);
+      Alert.alert('Saved', 'Waste Fee UPI settings have been updated.');
+    } catch (error: any) { Alert.alert('Save failed', error?.message || 'Unable to save UPI settings.'); }
+    finally { setSavingWastePaymentSettings(false); }
+  }
+
+  async function downloadWastePaymentReport() {
+    const rows = wasteBills.map((bill) => { const member = members.find((m) => m.user_id === bill.user_id); return `<tr><td>${member?.full_name || '-'}</td><td>${bill.account_no || '-'}</td><td>${bill.bill_month || '-'}</td><td>₹${Number(bill.amount || 0).toFixed(2)}</td><td>${bill.status || '-'}</td><td>${bill.payment_method || '-'}</td><td>${bill.payment_utr || '-'}</td><td>${bill.receipt_no || '-'}</td><td>${formatDateTime(bill.paid_at || bill.payment_submitted_at || bill.created_at)}</td></tr>`; }).join('');
+    const html = `<html><body style="font-family:Arial;padding:24px"><h1>SALEM YMA — Waste Fee Payment Report</h1><p>Generated ${formatDateTime(new Date().toISOString())}</p><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th>Member</th><th>Account</th><th>Month</th><th>Amount</th><th>Status</th><th>Method</th><th>UTR</th><th>Receipt</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+    try {
+      if (Platform.OS === 'web') {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) throw new Error('Please allow pop-ups in your browser to print the report.');
+        printWindow.document.write(`${html.replace('</body>', '<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body>')}`);
+        printWindow.document.close();
+        return;
+      }
+      const file = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'Save / share payment report' });
+      else await Print.printAsync({ html });
+    } catch (error: any) { Alert.alert('Report error', error?.message || 'Unable to create payment report.'); }
+  }
+
   function resetWasteBillForm() {
     setWasteMemberId('');
     setWasteAccountNo('YMA-0001');
@@ -1658,6 +1948,85 @@ export default function AdminScreen() {
     setWasteAmount('');
     setWasteDueDate('');
     setWasteStatus('unpaid');
+  }
+
+  async function createWasteBillsForAllMembers() {
+    const amount = Number(bulkWasteAmount.replace(/,/g, ''));
+    const billMonth = bulkWasteBillMonth.trim();
+
+    if (!billMonth) {
+      Alert.alert('Missing bill month', 'Please enter the billing month first.');
+      return;
+    }
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      Alert.alert('Invalid amount', 'Please enter a valid Waste Fee amount.');
+      return;
+    }
+
+    const eligibleMembers = members.filter((member) => Boolean(member.user_id));
+    if (!eligibleMembers.length) {
+      Alert.alert('No members found', 'There are no members with a valid user ID.');
+      return;
+    }
+
+    Alert.alert(
+      'Create bills for all members?',
+      `This will create a ₹${amount.toFixed(2)} Waste Fee bill for ${eligibleMembers.length} members for ${billMonth}. Existing bills for the same member and month will be skipped.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Create Bills',
+          onPress: async () => {
+            try {
+              setCreatingAllWasteBills(true);
+
+              const userIds = eligibleMembers.map((member) => member.user_id as string);
+              const { data: existingBills, error: existingError } = await supabase
+                .from('waste_bills')
+                .select('user_id, bill_month')
+                .in('user_id', userIds)
+                .eq('bill_month', billMonth);
+
+              if (existingError) throw existingError;
+
+              const existingSet = new Set(
+                (existingBills || []).map((bill) => `${bill.user_id}:${bill.bill_month}`),
+              );
+
+              const rows = eligibleMembers
+                .filter((member) => !existingSet.has(`${member.user_id}:${billMonth}`))
+                .map((member) => ({
+                  user_id: member.user_id,
+                  account_no: `YMA-${String(member.id).padStart(4, '0')}`,
+                  bill_month: billMonth,
+                  amount,
+                  status: 'unpaid',
+                }));
+
+              if (!rows.length) {
+                Alert.alert('No new bills', `All ${eligibleMembers.length} members already have a bill for ${billMonth}.`);
+                return;
+              }
+
+              const { error } = await supabase.from('waste_bills').insert(rows);
+              if (error) throw error;
+
+              Alert.alert(
+                'Bills created',
+                `Successfully created ${rows.length} Waste Fee bill${rows.length === 1 ? '' : 's'} for ${billMonth}. ${eligibleMembers.length - rows.length} existing bill${eligibleMembers.length - rows.length === 1 ? '' : 's'} skipped.`,
+              );
+
+              await loadAll();
+            } catch (error: any) {
+              Alert.alert('Bulk bill error', error?.message || 'Unable to create bills for all members.');
+            } finally {
+              setCreatingAllWasteBills(false);
+            }
+          },
+        },
+      ],
+    );
   }
 
   async function saveWasteBill() {
@@ -2183,6 +2552,31 @@ export default function AdminScreen() {
     );
   }
 
+  function resetSectionLeaderForm() {
+    setSectionLeaderSection('Section I'); setSectionLeaderPosition('Leader'); setSectionLeaderFullName(''); setSectionLeaderPhone(''); setSectionLeaderPhoto(''); setSectionLeaderDisplayOrder('1'); setSectionLeaderActive(true); setEditingSectionLeaderId(null);
+  }
+  function editSectionLeader(item: SectionLeader) {
+    setSectionLeaderSection(item.section); setSectionLeaderPosition(item.position); setSectionLeaderFullName(item.full_name); setSectionLeaderPhone(item.phone || ''); setSectionLeaderPhoto(item.photo_url || ''); setSectionLeaderDisplayOrder(String(item.display_order || 1)); setSectionLeaderActive(item.is_active !== false); setEditingSectionLeaderId(item.id); setSection('section-leaders');
+  }
+  async function pickSectionLeaderPhoto() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync(); if (!permission.granted) { Alert.alert('Permission required','Please allow photo library access.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes:['images'], allowsEditing:true, aspect:[1,1], quality:0.9 }); if (result.canceled || !result.assets?.[0]?.uri) return;
+    try { setSavingSectionLeader(true); setSectionLeaderPhoto(await uploadImage(result.assets[0].uri,'section-leaders')); } catch(error:any) { Alert.alert('Upload failed',error?.message || 'Unable to upload section leader photo.'); } finally { setSavingSectionLeader(false); }
+  }
+  async function saveSectionLeader() {
+    if (!sectionLeaderFullName.trim()) { Alert.alert('Missing name','Please enter the leader name.'); return; }
+    const order=Number(sectionLeaderDisplayOrder); if (!Number.isInteger(order)||order<1||order>6) { Alert.alert('Invalid position order','Position order must be between 1 and 6.'); return; }
+    const duplicatePosition=sectionLeaders.find(i=>i.section===sectionLeaderSection&&i.position===sectionLeaderPosition&&i.id!==editingSectionLeaderId); if(duplicatePosition){Alert.alert('Position already used',`${sectionLeaderPosition} already exists in ${sectionLeaderSection}.`);return;}
+    const duplicateOrder=sectionLeaders.find(i=>i.section===sectionLeaderSection&&i.display_order===order&&i.id!==editingSectionLeaderId); if(duplicateOrder){Alert.alert('Position order already used',`Position order ${order} is already assigned in ${sectionLeaderSection}.`);return;}
+    try { setSavingSectionLeader(true); const payload={section:sectionLeaderSection,position:sectionLeaderPosition,full_name:sectionLeaderFullName.trim(),phone:sectionLeaderPhone.trim()||null,photo_url:sectionLeaderPhoto||null,display_order:order,is_active:sectionLeaderActive};
+      if(editingSectionLeaderId){const{error}=await supabase.from('section_leaders').update(payload).eq('id',editingSectionLeaderId);if(error)throw error;Alert.alert('Updated','Section leader updated successfully.');}
+      else{const{error}=await supabase.from('section_leaders').insert(payload);if(error)throw error;Alert.alert('Added','Section leader added successfully.');}
+      resetSectionLeaderForm(); await loadAll();
+    } catch(error:any){Alert.alert('Save failed',error?.message || 'Unable to save section leader.');} finally {setSavingSectionLeader(false);}
+  }
+  async function toggleSectionLeader(item: SectionLeader) { try {const{error}=await supabase.from('section_leaders').update({is_active:!item.is_active}).eq('id',item.id);if(error)throw error;await loadAll();}catch(error:any){Alert.alert('Update failed',error?.message || 'Unable to change section leader visibility.');} }
+  async function deleteSectionLeader(item: SectionLeader) { Alert.alert('Delete section leader?',`Delete ${item.full_name} from ${item.section}?`,[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:async()=>{try{const{error}=await supabase.from('section_leaders').delete().eq('id',item.id);if(error)throw error;const storagePath=getStoragePathFromUrl(item.photo_url);if(storagePath)await supabase.storage.from('gallery').remove([storagePath]);if(editingSectionLeaderId===item.id)resetSectionLeaderForm();await loadAll();}catch(error:any){Alert.alert('Delete failed',error?.message || 'Unable to delete section leader.');}}}]); }
+
   function resetCemeteryForm() {
     setCemeteryDeceasedName('');
     setCemeteryDateOfBirth('');
@@ -2431,196 +2825,56 @@ export default function AdminScreen() {
 
   async function printGasBookings() {
     if (gasBookings.length === 0) {
-      Alert.alert(
-        'No bookings',
-        'There are no gas bookings to print.',
-      );
+      Alert.alert('No bookings', 'There are no gas bookings to print.');
       return;
     }
 
     try {
-      const rows = gasBookings
-        .map(
-          (booking, index) => `
-            <tr>
-              <td>${index + 1}</td>
-              <td>${escapeHtml(
-                booking.full_name,
-              )}</td>
-              <td>${escapeHtml(
-                booking.phone,
-              )}</td>
-              <td>${escapeHtml(
-                booking.address,
-              )}</td>
-              <td>${booking.cylinder_quantity}</td>
-              <td>${escapeHtml(
-                (
-                  booking.status ||
-                  'pending'
-                ).toUpperCase(),
-              )}</td>
-              <td>${escapeHtml(
-                formatDate(
-                  booking.created_at,
-                ),
-              )}</td>
-            </tr>
-          `,
-        )
-        .join('');
+      const rows = gasBookings.map((booking, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(booking.full_name)}</td>
+          <td>${escapeHtml(booking.phone)}</td>
+          <td>${booking.cylinder_quantity}</td>
+        </tr>`).join('');
 
       const html = `
-        <html>
-          <head>
-            <meta
-              name="viewport"
-              content="width=device-width, initial-scale=1.0"
-            />
+        <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+          @page { size: A4 portrait; margin: 22mm 16mm; }
+          body { font-family: Arial, sans-serif; color: #111; margin: 0; }
+          h1 { color: #C62828; margin: 0; font-size: 24px; }
+          h2 { margin: 4px 0 0; font-size: 17px; }
+          .subtitle { color: #666; margin: 7px 0 18px; font-size: 11px; }
+          table { width: 100%; border-collapse: collapse; font-size: 13px; }
+          th, td { border: 1px solid #aaa; padding: 10px 9px; text-align: left; }
+          th { background: #C62828; color: #fff; font-weight: 700; }
+          td:first-child, td:last-child, th:first-child, th:last-child { text-align: center; }
+          tr:nth-child(even) { background: #f7f7f7; }
+          .footer { margin-top: 18px; font-size: 9px; color: #777; border-top: 1px solid #ddd; padding-top: 8px; }
+        </style></head><body>
+          <h1>SALEM YMA</h1>
+          <h2>Gas Booking List</h2>
+          <div class="subtitle">Generated: ${escapeHtml(formatDate(new Date().toISOString()))} &nbsp; • &nbsp; Total Bookings: ${gasBookings.length}</div>
+          <table><thead><tr><th>No.</th><th>Booker Name</th><th>Phone Number</th><th>Gas Booked</th></tr></thead>
+          <tbody>${rows}</tbody></table>
+          <div class="footer">SALEM YMA • GAS BOOKING LIST</div>
+        </body></html>`;
 
-            <style>
-              @page {
-                size: A4 landscape;
-                margin: 18px;
-              }
-
-              body {
-                font-family: Arial, sans-serif;
-                padding: 10px;
-                color: #111111;
-              }
-
-              h1 {
-                color: #C62828;
-                margin: 0;
-                font-size: 24px;
-              }
-
-              h2 {
-                margin: 3px 0 0;
-                font-size: 16px;
-                color: #222222;
-              }
-
-              .subtitle {
-                color: #666666;
-                margin-top: 6px;
-                margin-bottom: 18px;
-                font-size: 11px;
-              }
-
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 10px;
-              }
-
-              th,
-              td {
-                border: 1px solid #cccccc;
-                padding: 7px;
-                text-align: left;
-                vertical-align: top;
-              }
-
-              th {
-                background: #C62828;
-                color: #ffffff;
-                font-weight: bold;
-              }
-
-              tr:nth-child(even) {
-                background: #f7f7f7;
-              }
-
-              .footer {
-                margin-top: 18px;
-                font-size: 9px;
-                color: #777777;
-                border-top: 1px solid #dddddd;
-                padding-top: 8px;
-              }
-            </style>
-          </head>
-
-          <body>
-            <h1>SALEM YMA</h1>
-
-            <h2>
-              Gas Booking Register
-            </h2>
-
-            <div class="subtitle">
-              Generated:
-              ${escapeHtml(
-                formatDate(
-                  new Date().toISOString(),
-                ),
-              )}
-              &nbsp; • &nbsp;
-              Total Bookings:
-              ${gasBookings.length}
-            </div>
-
-            <table>
-              <thead>
-                <tr>
-                  <th>No.</th>
-                  <th>Name</th>
-                  <th>Phone</th>
-                  <th>Address</th>
-                  <th>Cylinders</th>
-                  <th>Status</th>
-                  <th>Booked On</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                ${rows}
-              </tbody>
-            </table>
-
-            <div class="footer">
-              SALEM YMA BRANCH
-              • GAS BOOKING REGISTER
-            </div>
-          </body>
-        </html>
-      `;
-
-      await Print.printAsync({
-        html,
-      });
+      if (Platform.OS === 'web') {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) throw new Error('Please allow pop-ups in your browser to print.');
+        printWindow.document.write(`${html.replace('</body>', '<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body>')}`);
+        printWindow.document.close();
+      } else {
+        await Print.printAsync({ html });
+      }
     } catch (error: any) {
-      Alert.alert(
-        'Print failed',
-        error?.message ||
-          'Unable to open the print preview.',
-      );
+      Alert.alert('Print failed', error?.message || 'Unable to open the print preview.');
     }
   }
 
-  function resetCemeteryForm() {
-    setCemeteryDeceasedName('');
-    setCemeteryDateOfBirth('');
-    setCemeteryDateOfDeath('');
-    setCemeteryBurialDate('');
-    setCemeteryName('Salem Cemetery');
-    setCemeterySection('');
-    setCemeteryRowName('');
-    setCemeteryGraveNumber('');
-    setCemeteryFamilyName('');
-    setCemeteryFamilyContactName('');
-    setCemeteryFamilyContactPhone('');
-    setCemeteryBiography('');
-    setCemeteryGravePhoto('');
-    setCemeteryDocumentUrl('');
-    setCemeteryLatitude('');
-    setCemeteryLongitude('');
-    setCemeteryNotes('');
-    setCemeteryPublished(true);
-    setEditingCemeteryId(null);
-  }
+  
 
   function editCemetery(item: CemeteryRecord) {
     setEditingCemeteryId(item.id);
@@ -3052,6 +3306,7 @@ export default function AdminScreen() {
               ['waste', 'Waste Bills'],
               ['zonun', 'Zonun'],
               ['leaders', 'Branch Leaders'],
+              ['section-leaders', 'Section Hruaitute'],
               ['cemetery', 'Thlanmual'],
               ['admins', 'Admin Requests'],
               ['profile', 'My Profile'],
@@ -3336,6 +3591,7 @@ export default function AdminScreen() {
                 onPress={() => {
                   setSection('gas');
                   loadGasBookings();
+                  loadGasBookingArchive();
                 }}
               >
                 <View
@@ -3614,6 +3870,12 @@ export default function AdminScreen() {
                   'leaders',
                 ],
                 [
+                  '👥',
+                  'Section Hruaitute',
+                  'Manage Section I, II & III leaders',
+                  'section-leaders',
+                ],
+                [
                   '🔥',
                   'Gas Bookings',
                   'Manage LPG cylinder bookings',
@@ -3655,6 +3917,7 @@ export default function AdminScreen() {
                           | 'waste'
                           | 'zonun'
                           | 'leaders'
+                          | 'section-leaders'
                           | 'cemetery'
                           | 'gas',
                       );
@@ -3715,7 +3978,7 @@ export default function AdminScreen() {
               </View>
 
               <Pressable
-                onPress={loadAdminRequests}
+                onPress={() => loadAdminRequests()}
                 style={styles.smallButton}
                 disabled={loadingAdminRequests}
               >
@@ -4853,6 +5116,20 @@ export default function AdminScreen() {
               </View>
             </View>
 
+            <View style={styles.formCard}>
+              <Text style={styles.formTitle}>UPI Payment Settings</Text>
+              <Text style={styles.sectionDescription}>Members will use this UPI ID to pay Waste Fee. QR code is generated automatically.</Text>
+              <Text style={styles.label}>UPI ID</Text>
+              <TextInput value={wasteUpiId} onChangeText={setWasteUpiId} placeholder="yourname@upi" placeholderTextColor="#999" style={styles.input} autoCapitalize="none" />
+              <Text style={styles.label}>Payee Name</Text>
+              <TextInput value={wastePayeeName} onChangeText={setWastePayeeName} placeholder="Salem YMA" placeholderTextColor="#999" style={styles.input} />
+              <Text style={styles.label}>Payment Instructions</Text>
+              <TextInput value={wastePaymentInstructions} onChangeText={setWastePaymentInstructions} placeholder="Instructions for members" placeholderTextColor="#999" style={[styles.input, styles.textArea]} multiline />
+              {wasteUpiId ? <Image source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`upi://pay?pa=${wasteUpiId}&pn=${wastePayeeName || 'Salem YMA'}&cu=INR`)}` }} style={{ width: 180, height: 180, alignSelf: 'center', marginVertical: 10 }} /> : null}
+              <Pressable onPress={saveWastePaymentSettings} style={styles.primaryButton} disabled={savingWastePaymentSettings}>{savingWastePaymentSettings ? <ActivityIndicator color={WHITE} /> : <Text style={styles.primaryButtonText}>SAVE UPI SETTINGS</Text>}</Pressable>
+              <Pressable onPress={downloadWastePaymentReport} style={styles.outlineButton}><Text style={styles.outlineButtonText}>DOWNLOAD PAYMENT REPORT</Text></Pressable>
+            </View>
+
             <LinearGradient
               colors={[RED, BLACK]}
               start={{ x: 0, y: 0 }}
@@ -4880,6 +5157,42 @@ export default function AdminScreen() {
                 </Text>
               </View>
             </LinearGradient>
+
+            <View style={styles.formCard}>
+              <Text style={styles.formTitle}>Create Bills for All Members</Text>
+              <Text style={styles.sectionDescription}>Set the amount and billing month. One bill will be created for every member with a valid account. Existing bills for the same month are skipped.</Text>
+
+              <Text style={styles.label}>Waste Fee Amount</Text>
+              <TextInput
+                value={bulkWasteAmount}
+                onChangeText={setBulkWasteAmount}
+                placeholder="200"
+                placeholderTextColor="#999999"
+                style={styles.input}
+                keyboardType="decimal-pad"
+              />
+
+              <Text style={styles.label}>Billing Month</Text>
+              <TextInput
+                value={bulkWasteBillMonth}
+                onChangeText={setBulkWasteBillMonth}
+                placeholder="October 2026"
+                placeholderTextColor="#999999"
+                style={styles.input}
+              />
+
+              <Pressable
+                onPress={createWasteBillsForAllMembers}
+                style={styles.primaryButton}
+                disabled={creatingAllWasteBills}
+              >
+                {creatingAllWasteBills ? (
+                  <ActivityIndicator color={WHITE} />
+                ) : (
+                  <Text style={styles.primaryButtonText}>CREATE WASTE BILL FOR ALL MEMBERS</Text>
+                )}
+              </Pressable>
+            </View>
 
             <View style={styles.formCard}>
               <Text style={styles.formTitle}>
@@ -5151,6 +5464,10 @@ export default function AdminScreen() {
                     </View>
                   </View>
 
+                  {bill.payment_utr ? (
+                    <View style={styles.paidInfoCard}><Text style={styles.paidInfoText}>UPI UTR: {bill.payment_utr} • Submitted {formatDateTime(bill.payment_submitted_at)}</Text></View>
+                  ) : null}
+
                   {isPaid ? (
                     <View style={styles.paidInfoCard}>
                       <Text style={styles.paidInfoText}>
@@ -5171,7 +5488,7 @@ export default function AdminScreen() {
                         style={styles.actionButton}
                       >
                         <Text style={styles.actionText}>
-                          MARK PAID
+                          {bill.status?.toLowerCase() === 'pending' ? 'VERIFY & ISSUE RECEIPT' : 'MARK PAID'}
                         </Text>
                       </Pressable>
                     )}
@@ -5419,7 +5736,7 @@ export default function AdminScreen() {
             </View>
 
             <View style={styles.formCard}>
-              <View style={styles.zonunFormHeader}>
+              <View>
                 <Text style={styles.formTitle}>
                   {editingLeaderId ? 'Edit Branch Leader' : 'Add Branch Leader'}
                 </Text>
@@ -5617,6 +5934,26 @@ export default function AdminScreen() {
           </View>
         )}
 
+
+        {section === 'section-leaders' && (
+          <View>
+            <View style={styles.sectionHeaderRow}><View style={{flex:1}}><Text style={styles.sectionTitle}>Section Hruaitute</Text><Text style={styles.sectionDescription}>Branch Hruaitute hnuaiah • Section I, II & III • Hruaitu 6 each</Text></View><View style={styles.leaderCountBadge}><Text style={styles.leaderCountText}>{sectionLeaders.length}</Text></View></View>
+            <View style={styles.formCard}>
+              <Text style={styles.formTitle}>{editingSectionLeaderId?'Edit Section Hruaitu':'Add Section Hruaitu'}</Text>
+              {editingSectionLeaderId?<Pressable style={styles.smallButton} onPress={resetSectionLeaderForm} disabled={savingSectionLeader}><Text style={styles.smallButtonText}>Cancel Edit</Text></Pressable>:null}
+              <Text style={styles.label}>Section</Text><View style={styles.positionGrid}>{SECTION_NAMES.map(item=><Pressable key={item} onPress={()=>setSectionLeaderSection(item)} style={[styles.positionChip,sectionLeaderSection===item&&styles.positionChipActive]}><Text style={[styles.positionChipText,sectionLeaderSection===item&&styles.positionChipTextActive]}>{item}</Text></Pressable>)}</View>
+              <Text style={styles.label}>Position</Text><View style={styles.positionGrid}>{SECTION_LEADER_POSITIONS.map(item=><Pressable key={item} onPress={()=>setSectionLeaderPosition(item)} style={[styles.positionChip,sectionLeaderPosition===item&&styles.positionChipActive]}><Text style={[styles.positionChipText,sectionLeaderPosition===item&&styles.positionChipTextActive]}>{item}</Text></Pressable>)}</View>
+              <Text style={styles.label}>Full Name</Text><TextInput style={styles.input} value={sectionLeaderFullName} onChangeText={setSectionLeaderFullName} placeholder="Enter full name" placeholderTextColor="#999" />
+              <Text style={styles.label}>Contact</Text><TextInput style={styles.input} value={sectionLeaderPhone} onChangeText={setSectionLeaderPhone} placeholder="Contact number" placeholderTextColor="#999" keyboardType="phone-pad" />
+              <Text style={styles.label}>Display Order (1–6)</Text><TextInput style={styles.input} value={sectionLeaderDisplayOrder} onChangeText={setSectionLeaderDisplayOrder} placeholder="1" placeholderTextColor="#999" keyboardType="number-pad" />
+              <Pressable style={styles.outlineButton} onPress={pickSectionLeaderPhoto} disabled={savingSectionLeader}><Text style={styles.outlineButtonText}>{sectionLeaderPhoto?'Change Photo':'Upload Photo'}</Text></Pressable>
+              {sectionLeaderPhoto?<View style={styles.leaderPhotoPreviewWrap}><Image source={{uri:sectionLeaderPhoto}} style={styles.leaderPhotoPreview}/><Text style={styles.leaderPhotoPreviewText}>Photo selected</Text></View>:null}
+              <Pressable style={styles.visibilityRow} onPress={()=>setSectionLeaderActive(v=>!v)}><View style={[styles.visibilityDot,sectionLeaderActive&&styles.visibilityDotActive]}/><View style={{flex:1}}><Text style={styles.visibilityTitle}>{sectionLeaderActive?'Visible on Branch page':'Hidden from Branch page'}</Text><Text style={styles.visibilitySubtitle}>Tap to {sectionLeaderActive?'hide':'show'} this member</Text></View></Pressable>
+              <Pressable style={styles.primaryButton} onPress={saveSectionLeader} disabled={savingSectionLeader}>{savingSectionLeader?<ActivityIndicator color={WHITE}/>:<Text style={styles.primaryButtonText}>{editingSectionLeaderId?'Save Changes':'Add Section Hruaitu'}</Text>}</Pressable>
+            </View>
+            {SECTION_NAMES.map(sectionName=>{const items=sectionLeaders.filter(i=>i.section===sectionName).sort((a,b)=>a.display_order-b.display_order);return <View key={sectionName} style={{marginBottom:22}}><Text style={styles.formTitle}>{sectionName} • {items.length}/6 Hruaitu</Text>{items.length===0?<View style={styles.emptyCard}><Text style={styles.emptyTitle}>No hruaitu yet</Text><Text style={styles.emptyText}>Add up to 6 Section Hruaitute for {sectionName}.</Text></View>:items.map(item=><View key={item.id} style={styles.leaderAdminCard}>{item.photo_url?<Image source={{uri:item.photo_url}} style={styles.leaderAdminPhoto}/>:<View style={styles.leaderAdminPhotoPlaceholder}><Text style={styles.leaderAdminPhotoPlaceholderText}>👤</Text></View>}<View style={styles.leaderAdminInfo}><Text style={styles.leaderAdminPosition}>{item.position}</Text><Text style={styles.leaderAdminName}>{item.full_name}</Text>{item.phone?<Text style={styles.leaderAdminPhone}>{item.phone}</Text>:null}<Text style={styles.leaderAdminMeta}>{item.is_active?'Visible':'Hidden'}</Text></View><View style={styles.leaderAdminActions}><Pressable style={styles.smallActionButton} onPress={()=>editSectionLeader(item)}><Text style={styles.smallActionText}>Edit</Text></Pressable><Pressable style={styles.smallActionButton} onPress={()=>toggleSectionLeader(item)}><Text style={styles.smallActionText}>{item.is_active?'Hide':'Show'}</Text></Pressable><Pressable style={[styles.smallActionButton,styles.deleteAction]} onPress={()=>deleteSectionLeader(item)}><Text style={[styles.smallActionText,styles.deleteActionText]}>Delete</Text></Pressable></View></View>)}</View>})}
+          </View>
+        )}
 
         {section === 'cemetery' && (
           <>
@@ -6035,7 +6372,7 @@ export default function AdminScreen() {
               </View>
 
               <Pressable
-                onPress={loadGasBookings}
+                onPress={() => { loadGasBookings(); loadGasBookingArchive(); }}
                 style={styles.smallButton}
               >
                 <Text style={styles.smallButtonText}>
@@ -6053,6 +6390,56 @@ export default function AdminScreen() {
                 {gasBookings.length})
               </Text>
             </Pressable>
+
+            <View style={{ marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: BORDER }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: TEXT, marginBottom: 8 }}>
+                GAS BOOKING DELETED DATE
+              </Text>
+              <Text style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>
+                Deleted ni thlan la, chumi ni-ah deleted gas booking list chauh PDF-ah print rawh.
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <Pressable
+                  onPress={() => setSelectedGasArchiveDate(null)}
+                  style={{ paddingVertical: 9, paddingHorizontal: 13, borderRadius: 20, marginRight: 7, backgroundColor: selectedGasArchiveDate === null ? RED : '#F0F0F0' }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: selectedGasArchiveDate === null ? WHITE : TEXT }}>
+                    ALL DATES
+                  </Text>
+                </Pressable>
+                {gasArchiveDates.map((dateKey) => (
+                  <Pressable
+                    key={dateKey}
+                    onPress={() => setSelectedGasArchiveDate(dateKey)}
+                    style={{ paddingVertical: 9, paddingHorizontal: 13, borderRadius: 20, marginRight: 7, backgroundColor: selectedGasArchiveDate === dateKey ? RED : '#F0F0F0' }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '900', color: selectedGasArchiveDate === dateKey ? WHITE : TEXT }}>
+                      {formatDate(`${dateKey}T00:00:00`)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Text style={{ marginTop: 10, fontSize: 12, fontWeight: '800', color: '#37474F' }}>
+                Selected: {selectedGasArchiveDate ? formatDate(`${selectedGasArchiveDate}T00:00:00`) : 'All deleted dates'} • {selectedGasArchiveBookings.length} booking(s)
+              </Text>
+              <Pressable
+                onPress={printGasBookingArchive}
+                style={[styles.printGasButton, { backgroundColor: '#37474F', marginTop: 10 }]}
+              >
+                <Text style={styles.printGasButtonText}>
+                  📁 GAS BOOKING HISTORY PDF ({selectedGasArchiveBookings.length})
+                </Text>
+              </Pressable>
+            </View>
+
+            {gasBookings.length > 0 && (
+              <Pressable
+                onPress={deleteAllGasBookings}
+                style={{ marginTop: 10, paddingVertical: 13, borderRadius: 10, backgroundColor: '#8E1B1B', alignItems: 'center' }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>🗑️ DELETE ALL BOOKINGS — KEEP HISTORY</Text>
+              </Pressable>
+            )}
 
             {loadingGasBookings ? (
               <View style={styles.emptyCard}>
@@ -6158,53 +6545,6 @@ export default function AdminScreen() {
                       </View>
                     </View>
 
-                    <View
-                      style={
-                        styles.wasteBillDetails
-                      }
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={
-                            styles.wasteDetailLabel
-                          }
-                        >
-                          ADDRESS
-                        </Text>
-
-                        <Text
-                          style={
-                            styles.wasteDetailValueSmall
-                          }
-                        >
-                          {booking.address}
-                        </Text>
-                      </View>
-
-                      <View
-                        style={{
-                          marginLeft: 15,
-                        }}
-                      >
-                        <Text
-                          style={
-                            styles.wasteDetailLabel
-                          }
-                        >
-                          BOOKED
-                        </Text>
-
-                        <Text
-                          style={
-                            styles.wasteDetailValueSmall
-                          }
-                        >
-                          {formatDate(
-                            booking.created_at,
-                          )}
-                        </Text>
-                      </View>
-                    </View>
 
                     <Text
                       style={[
@@ -6250,6 +6590,7 @@ export default function AdminScreen() {
                         </Pressable>
                       ))}
                     </View>
+
                   </View>
                 );
               })
@@ -6927,6 +7268,7 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
     marginBottom: 22,
   },
+
 
   formTitle: {
     color: TEXT,

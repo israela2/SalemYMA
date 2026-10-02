@@ -5,35 +5,25 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 
 export default function HomeScreen() {
-  const { width } = useWindowDimensions();
-
-  const isWebDesktop = width >= 900;
-
   return (
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
     >
-      {/* HEADER */}
+      {/* Premium Red → Black Header */}
       <LinearGradient
         colors={['#D32F2F', '#8E1B1B', '#0B0B0B']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[
-          styles.header,
-          isWebDesktop && styles.desktopHeader,
-        ]}
+        style={styles.header}
       >
         <View style={styles.headerTop}>
-
-          {/* BRAND */}
           <View style={styles.brandArea}>
             <View style={styles.logoContainer}>
               <Image
@@ -54,77 +44,6 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* DESKTOP NAVIGATION */}
-          {isWebDesktop && (
-            <View style={styles.desktopNav}>
-
-              <Pressable
-                style={styles.navItemActive}
-                onPress={() => router.push('/')}
-              >
-                <Text style={styles.navTextActive}>
-                  Home
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.navItem}
-                onPress={() => router.push('/zonun')}
-              >
-                <Text style={styles.navText}>
-                  Zonun
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.navItem}
-                onPress={() => router.push('/news')}
-              >
-                <Text style={styles.navText}>
-                  News
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.navItem}
-                onPress={() => router.push('/events')}
-              >
-                <Text style={styles.navText}>
-                  Events
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.navItem}
-                onPress={() => router.push('/gallery')}
-              >
-                <Text style={styles.navText}>
-                  Gallery
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.navItem}
-                onPress={() => router.push('/activities')}
-              >
-                <Text style={styles.navText}>
-                  Activities
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.navLogin}
-                onPress={() => router.push('/login')}
-              >
-                <Text style={styles.navLoginText}>
-                  Login
-                </Text>
-              </Pressable>
-
-            </View>
-          )}
-
-          {/* NOTIFICATION */}
           <Pressable
             style={styles.notificationButton}
             onPress={() => router.push('/notifications')}
@@ -135,10 +54,8 @@ export default function HomeScreen() {
 
             <View style={styles.notificationDot} />
           </Pressable>
-
         </View>
 
-        {/* WELCOME */}
         <View style={styles.headerWelcome}>
           <Text style={styles.headerWelcomeSmall}>
             HELLO, WELCOME
@@ -154,198 +71,163 @@ export default function HomeScreen() {
         </View>
       </LinearGradient>
 
-      {/* MAIN CONTENT */}
-      <View
-        style={[
-          styles.content,
-          isWebDesktop && styles.desktopContent,
-        ]}
-      >
+      {/* Main Content */}
+      <View style={styles.content}>
 
-        {/* FEATURE CARDS */}
-        <View
-          style={
-            isWebDesktop
-              ? styles.desktopFeatureGrid
-              : undefined
-          }
+        {/* Waste Fee Featured Card */}
+        <Pressable
+          style={styles.featureCard}
+          onPress={() => router.push('/waste-fee')}
         >
-
-          {/* WASTE FEE */}
-          <Pressable
-            style={[
-              styles.featureCard,
-              isWebDesktop && styles.desktopCard,
-            ]}
-            onPress={() => router.push('/waste-fee')}
+          <LinearGradient
+            colors={['#D32F2F', '#8E1B1B', '#0B0B0B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.featureGradient}
           >
-            <LinearGradient
-              colors={['#D32F2F', '#8E1B1B', '#0B0B0B']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.featureGradient}
-            >
-              <View style={styles.featureTop}>
-                <View style={styles.featureIcon}>
-                  <Text style={styles.featureIconText}>
-                    🗑️
-                  </Text>
-                </View>
-
-                <View style={styles.featureBadge}>
-                  <Text style={styles.featureBadgeText}>
-                    QUICK SERVICE
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={styles.featureTitle}>
-                Bawhhlawh Paih Man
-              </Text>
-
-              <Text style={styles.featureDescription}>
-                Check your waste collection fee and manage
-                your payment easily.
-              </Text>
-
-              <View style={styles.featureBottom}>
-                <Text style={styles.featureAction}>
-                  Open Service
-                </Text>
-
-                <Text style={styles.featureArrow}>
-                  →
+            <View style={styles.featureTop}>
+              <View style={styles.featureIcon}>
+                <Text style={styles.featureIconText}>
+                  🗑️
                 </Text>
               </View>
-            </LinearGradient>
-          </Pressable>
 
-          {/* ZONUN */}
-          <Pressable
-            style={[
-              styles.gasCard,
-              isWebDesktop && styles.desktopCard,
-            ]}
-            onPress={() => router.push('/zonun')}
+              <View style={styles.featureBadge}>
+                <Text style={styles.featureBadgeText}>
+                  QUICK SERVICE
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.featureTitle}>
+              Bawhhlawh Paih Man
+            </Text>
+
+            <Text style={styles.featureDescription}>
+              Check your waste collection fee and manage
+              your payment easily.
+            </Text>
+
+            <View style={styles.featureBottom}>
+              <Text style={styles.featureAction}>
+                Open Service
+              </Text>
+
+              <Text style={styles.featureArrow}>
+                →
+              </Text>
+            </View>
+          </LinearGradient>
+        </Pressable>
+
+
+        {/* Zonun Featured Card */}
+<Pressable
+  style={styles.gasCard}
+  onPress={() => router.push('/zonun')}
+>
+  <LinearGradient
+    colors={['#111111', '#8E1B1B', '#C62828']}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={styles.gasGradient}
+  >
+    <View style={styles.gasTop}>
+
+      <View style={styles.gasIcon}>
+        <Text style={styles.gasIconText}>
+          📖
+        </Text>
+      </View>
+
+      <View style={styles.gasBadge}>
+        <Text style={styles.gasBadgeText}>
+          YMA DOCUMENT
+        </Text>
+      </View>
+
+    </View>
+
+    <Text style={styles.gasTitle}>
+      Zonun
+    </Text>
+
+    <Text style={styles.gasDescription}>
+      Salem YMA Zonun leh thuthlung te PDF hmangin chhiar rawh.
+    </Text>
+
+    <View style={styles.gasBottom}>
+
+      <Text style={styles.gasAction}>
+        Open Zonun
+      </Text>
+
+      <Text style={styles.gasArrow}>
+        →
+      </Text>
+
+    </View>
+
+  </LinearGradient>
+</Pressable>
+
+        {/* Gas Booking Featured Card */}
+        <Pressable
+          style={styles.gasCard}
+          onPress={() => router.push('/gas-booking')}
+        >
+          <LinearGradient
+            colors={['#111111', '#8E1B1B', '#C62828']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.gasGradient}
           >
-            <LinearGradient
-              colors={['#111111', '#8E1B1B', '#C62828']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.gasGradient}
-            >
-              <View style={styles.gasTop}>
-
-                <View style={styles.gasIcon}>
-                  <Text style={styles.gasIconText}>
-                    📖
-                  </Text>
-                </View>
-
-                <View style={styles.gasBadge}>
-                  <Text style={styles.gasBadgeText}>
-                    YMA DOCUMENT
-                  </Text>
-                </View>
-
+            <View style={styles.gasTop}>
+              <View style={styles.gasIcon}>
+                <Text style={styles.gasIconText}>
+                  🔥
+                </Text>
               </View>
 
-              <Text style={styles.gasTitle}>
-                Zonun
-              </Text>
-
-              <Text style={styles.gasDescription}>
-                Salem YMA Zonun leh thuthlung te PDF hmangin chhiar rawh.
-              </Text>
-
-              <View style={styles.gasBottom}>
-
-                <Text style={styles.gasAction}>
-                  Open Zonun
+              <View style={styles.gasBadge}>
+                <Text style={styles.gasBadgeText}>
+                  QUICK SERVICE
                 </Text>
-
-                <Text style={styles.gasArrow}>
-                  →
-                </Text>
-
               </View>
-            </LinearGradient>
-          </Pressable>
+            </View>
 
-          {/* GAS BOOKING */}
-          <Pressable
-            style={[
-              styles.gasCard,
-              isWebDesktop && styles.desktopCard,
-            ]}
-            onPress={() => router.push('/gas-booking')}
-          >
-            <LinearGradient
-              colors={['#111111', '#8E1B1B', '#C62828']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.gasGradient}
-            >
-              <View style={styles.gasTop}>
+            <Text style={styles.gasTitle}>
+              Gas Booking
+            </Text>
 
-                <View style={styles.gasIcon}>
-                  <Text style={styles.gasIconText}>
-                    🔥
-                  </Text>
-                </View>
+            <Text style={styles.gasDescription}>
+              Book your LPG gas cylinder easily through Salem YMA.
+            </Text>
 
-                <View style={styles.gasBadge}>
-                  <Text style={styles.gasBadgeText}>
-                    QUICK SERVICE
-                  </Text>
-                </View>
-
-              </View>
-
-              <Text style={styles.gasTitle}>
-                Gas Booking
+            <View style={styles.gasBottom}>
+              <Text style={styles.gasAction}>
+                Book Gas
               </Text>
 
-              <Text style={styles.gasDescription}>
-                Book your LPG gas cylinder easily through Salem YMA.
+              <Text style={styles.gasArrow}>
+                →
               </Text>
+            </View>
+          </LinearGradient>
+        </Pressable>
 
-              <View style={styles.gasBottom}>
-
-                <Text style={styles.gasAction}>
-                  Book Gas
-                </Text>
-
-                <Text style={styles.gasArrow}>
-                  →
-                </Text>
-
-              </View>
-            </LinearGradient>
-          </Pressable>
-
-        </View>
-
-        {/* QUICK ACCESS */}
+        {/* Quick Access */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
             Quick Access
           </Text>
         </View>
 
-        <View
-          style={[
-            styles.quickGrid,
-            isWebDesktop && styles.desktopQuickGrid,
-          ]}
-        >
+        <View style={styles.quickGrid}>
 
-          {/* NEWS */}
+          {/* News */}
           <Pressable
-            style={[
-              styles.quickCard,
-              isWebDesktop && styles.desktopQuickCard,
-            ]}
+            style={styles.quickCard}
             onPress={() => router.push('/news')}
           >
             <View style={[styles.quickIcon, styles.redIcon]}>
@@ -363,12 +245,9 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
 
-          {/* EVENTS */}
+          {/* Events */}
           <Pressable
-            style={[
-              styles.quickCard,
-              isWebDesktop && styles.desktopQuickCard,
-            ]}
+            style={styles.quickCard}
             onPress={() => router.push('/events')}
           >
             <View style={[styles.quickIcon, styles.darkIcon]}>
@@ -386,12 +265,9 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
 
-          {/* GALLERY */}
+          {/* Gallery */}
           <Pressable
-            style={[
-              styles.quickCard,
-              isWebDesktop && styles.desktopQuickCard,
-            ]}
+            style={styles.quickCard}
             onPress={() => router.push('/gallery')}
           >
             <View style={[styles.quickIcon, styles.grayIcon]}>
@@ -409,12 +285,9 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
 
-          {/* ACTIVITIES */}
+          {/* Activities */}
           <Pressable
-            style={[
-              styles.quickCard,
-              isWebDesktop && styles.desktopQuickCard,
-            ]}
+            style={styles.quickCard}
             onPress={() => router.push('/activities')}
           >
             <View style={[styles.quickIcon, styles.blackIcon]}>
@@ -434,146 +307,115 @@ export default function HomeScreen() {
 
         </View>
 
-        {/* NEWS + EVENT DESKTOP ROW */}
-        <View
-          style={
-            isWebDesktop
-              ? styles.desktopTwoColumn
-              : undefined
-          }
-        >
+        {/* Latest News */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            Latest News
+          </Text>
 
-          {/* LATEST NEWS */}
-          <View
-            style={
-              isWebDesktop
-                ? styles.desktopColumn
-                : undefined
-            }
-          >
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                Latest News
-              </Text>
-
-              <Pressable
-                onPress={() => router.push('/news')}
-              >
-                <Text style={styles.viewAll}>
-                  View All
-                </Text>
-              </Pressable>
-            </View>
-
-            <Pressable
-              style={styles.newsCard}
-              onPress={() => router.push('/news')}
-            >
-              <LinearGradient
-                colors={['#D32F2F', '#111111']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.newsDate}
-              >
-                <Text style={styles.newsMonth}>
-                  SEP
-                </Text>
-
-                <Text style={styles.newsDay}>
-                  26
-                </Text>
-              </LinearGradient>
-
-              <View style={styles.newsContent}>
-                <View style={styles.newsBadge}>
-                  <Text style={styles.newsBadgeText}>
-                    ANNOUNCEMENT
-                  </Text>
-                </View>
-
-                <Text style={styles.newsTitle}>
-                  Salem YMA Important Announcement
-                </Text>
-
-                <Text
-                  style={styles.newsDescription}
-                  numberOfLines={2}
-                >
-                  Important announcements and information
-                  from Salem YMA will be shared here.
-                </Text>
-              </View>
-
-              <Text style={styles.cardArrow}>
-                ›
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* UPCOMING EVENT */}
-          <View
-            style={
-              isWebDesktop
-                ? styles.desktopColumn
-                : undefined
-            }
-          >
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                Upcoming Event
-              </Text>
-
-              <Pressable
-                onPress={() => router.push('/events')}
-              >
-                <Text style={styles.viewAll}>
-                  View All
-                </Text>
-              </Pressable>
-            </View>
-
-            <Pressable
-              style={styles.eventCard}
-              onPress={() => router.push('/events')}
-            >
-              <LinearGradient
-                colors={['#D32F2F', '#111111']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.eventDateBox}
-              >
-                <Text style={styles.eventMonth}>
-                  SEP
-                </Text>
-
-                <Text style={styles.eventDay}>
-                  28
-                </Text>
-              </LinearGradient>
-
-              <View style={styles.eventContent}>
-                <Text style={styles.eventTitle}>
-                  Salem YMA Programme
-                </Text>
-
-                <Text style={styles.eventInfo}>
-                  📍 Salem, Mizoram
-                </Text>
-
-                <Text style={styles.eventInfo}>
-                  🕒 Upcoming programme
-                </Text>
-              </View>
-
-              <Text style={styles.cardArrow}>
-                ›
-              </Text>
-            </Pressable>
-          </View>
-
+          <Pressable onPress={() => router.push('/news')}>
+            <Text style={styles.viewAll}>
+              View All
+            </Text>
+          </Pressable>
         </View>
 
-        {/* COMMUNITY MESSAGE */}
+        <Pressable
+          style={styles.newsCard}
+          onPress={() => router.push('/news')}
+        >
+          <LinearGradient
+            colors={['#D32F2F', '#111111']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.newsDate}
+          >
+            <Text style={styles.newsMonth}>
+              SEP
+            </Text>
+
+            <Text style={styles.newsDay}>
+              26
+            </Text>
+          </LinearGradient>
+
+          <View style={styles.newsContent}>
+            <View style={styles.newsBadge}>
+              <Text style={styles.newsBadgeText}>
+                ANNOUNCEMENT
+              </Text>
+            </View>
+
+            <Text style={styles.newsTitle}>
+              Salem YMA Important Announcement
+            </Text>
+
+            <Text
+              style={styles.newsDescription}
+              numberOfLines={2}
+            >
+              Important announcements and information
+              from Salem YMA will be shared here.
+            </Text>
+          </View>
+
+          <Text style={styles.cardArrow}>
+            ›
+          </Text>
+        </Pressable>
+
+        {/* Upcoming Event */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            Upcoming Event
+          </Text>
+
+          <Pressable onPress={() => router.push('/events')}>
+            <Text style={styles.viewAll}>
+              View All
+            </Text>
+          </Pressable>
+        </View>
+
+        <Pressable
+          style={styles.eventCard}
+          onPress={() => router.push('/events')}
+        >
+          <LinearGradient
+            colors={['#D32F2F', '#111111']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.eventDateBox}
+          >
+            <Text style={styles.eventMonth}>
+              SEP
+            </Text>
+
+            <Text style={styles.eventDay}>
+              28
+            </Text>
+          </LinearGradient>
+
+          <View style={styles.eventContent}>
+            <Text style={styles.eventTitle}>
+              Salem YMA Programme
+            </Text>
+
+            <Text style={styles.eventInfo}>
+              📍 Salem, Mizoram
+            </Text>
+
+            <Text style={styles.eventInfo}>
+              🕒 Upcoming programme
+            </Text>
+          </View>
+
+          <Text style={styles.cardArrow}>
+            ›
+          </Text>
+        </Pressable>
+
+        {/* Community Message */}
         <LinearGradient
           colors={['#D32F2F', '#0B0B0B']}
           start={{ x: 0, y: 0 }}
@@ -599,16 +441,12 @@ export default function HomeScreen() {
         </LinearGradient>
 
         <View style={styles.bottomSpace} />
-
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-
-  /* MAIN */
-
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
@@ -623,12 +461,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     overflow: 'hidden',
-  },
-
-  desktopHeader: {
-    paddingTop: 28,
-    paddingHorizontal: 40,
-    paddingBottom: 35,
   },
 
   headerTop: {
@@ -674,59 +506,6 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  /* DESKTOP NAV */
-
-  desktopNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    marginHorizontal: 25,
-  },
-
-  navItem: {
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    borderRadius: 10,
-    marginHorizontal: 2,
-  },
-
-  navItemActive: {
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF22',
-    marginHorizontal: 2,
-  },
-
-  navText: {
-    color: '#EEEEEE',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  navTextActive: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-
-  navLogin: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 17,
-    paddingVertical: 9,
-    borderRadius: 10,
-    marginLeft: 7,
-  },
-
-  navLoginText: {
-    color: '#8E1B1B',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-
-  /* NOTIFICATION */
-
   notificationButton: {
     width: 44,
     height: 44,
@@ -749,8 +528,6 @@ const styles = StyleSheet.create({
     top: 9,
     right: 10,
   },
-
-  /* WELCOME */
 
   headerWelcome: {
     marginTop: 28,
@@ -783,28 +560,7 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
 
-  desktopContent: {
-    width: '100%',
-    maxWidth: 1200,
-    alignSelf: 'center',
-    paddingHorizontal: 30,
-    paddingTop: 25,
-  },
-
-  /* FEATURE GRID */
-
-  desktopFeatureGrid: {
-    flexDirection: 'row',
-    width: '100%',
-  },
-
-  desktopCard: {
-    flex: 1,
-    marginTop: 0,
-    marginHorizontal: 6,
-  },
-
-  /* WASTE FEE */
+  /* FEATURE */
 
   featureCard: {
     borderRadius: 22,
@@ -813,7 +569,6 @@ const styles = StyleSheet.create({
 
   featureGradient: {
     padding: 19,
-    minHeight: 190,
   },
 
   featureTop: {
@@ -885,7 +640,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  /* ZONUN / GAS */
+  /* GAS BOOKING */
 
   gasCard: {
     borderRadius: 22,
@@ -895,7 +650,6 @@ const styles = StyleSheet.create({
 
   gasGradient: {
     padding: 19,
-    minHeight: 190,
   },
 
   gasTop: {
@@ -997,11 +751,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
 
-  desktopQuickGrid: {
-    flexWrap: 'nowrap',
-    justifyContent: 'space-between',
-  },
-
   quickCard: {
     width: '48%',
     backgroundColor: '#FFFFFF',
@@ -1010,11 +759,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#E5E5E5',
-  },
-
-  desktopQuickCard: {
-    width: '24%',
-    marginHorizontal: 2,
   },
 
   quickIcon: {
@@ -1056,18 +800,6 @@ const styles = StyleSheet.create({
     color: '#777777',
     fontSize: 9,
     marginTop: 3,
-  },
-
-  /* TWO COLUMN */
-
-  desktopTwoColumn: {
-    flexDirection: 'row',
-    width: '100%',
-  },
-
-  desktopColumn: {
-    flex: 1,
-    marginHorizontal: 6,
   },
 
   /* NEWS */

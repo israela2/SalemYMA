@@ -1,21 +1,8 @@
-import {
-  Tabs,
-  router,
-  usePathname,
-} from 'expo-router';
-
+import { Tabs, router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-
-import {
-  Platform,
-  Text,
-  View,
-} from 'react-native';
+import { Text, View } from 'react-native';
 
 import { supabase } from '../lib/supabase';
-
-const GUEST_KEY =
-  'salem_yma_guest_mode';
 
 function TabIcon({
   icon,
@@ -122,18 +109,10 @@ export default function TabLayout() {
     useState(true);
 
   /*
-   * WEB ONLY GUEST MODE
-   *
-   * Guest mode is stored in sessionStorage.
-   *
-   * Android/iOS will always keep
-   * isGuest = false.
-   */
-  const [isGuest, setIsGuest] =
-    useState(false);
-
-  /*
    * PUBLIC PAGES
+   *
+   * User does not need to be logged in
+   * to open these pages.
    */
   const isPublicPage =
     pathname === '/login' ||
@@ -148,47 +127,13 @@ export default function TabLayout() {
     let mounted = true;
 
     async function checkSession() {
-      try {
-        const {
-          data: { session },
-        } =
-          await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-        /*
-         * Check Guest Mode only on Web.
-         */
-        let webGuest = false;
-
-        if (
-          Platform.OS === 'web' &&
-          typeof window !== 'undefined' &&
-          typeof window.sessionStorage !==
-            'undefined'
-        ) {
-          webGuest =
-            window.sessionStorage.getItem(
-              GUEST_KEY,
-            ) === 'true';
-        }
-
-        if (mounted) {
-          setSession(session);
-          setIsGuest(webGuest);
-        }
-      } catch (error) {
-        console.log(
-          'Session check error:',
-          error,
-        );
-
-        if (mounted) {
-          setSession(null);
-          setIsGuest(false);
-        }
-      } finally {
-        if (mounted) {
-          setCheckingAuth(false);
-        }
+      if (mounted) {
+        setSession(session);
+        setCheckingAuth(false);
       }
     }
 
@@ -196,36 +141,12 @@ export default function TabLayout() {
 
     const {
       data: { subscription },
-    } =
-      supabase.auth.onAuthStateChange(
-        (_event, newSession) => {
-          if (!mounted) {
-            return;
-          }
-
-          setSession(newSession);
-
-          /*
-           * Real Supabase login:
-           * remove Guest Mode.
-           */
-          if (
-            Platform.OS === 'web' &&
-            newSession &&
-            typeof window !== 'undefined' &&
-            typeof window.sessionStorage !==
-              'undefined'
-          ) {
-            window.sessionStorage.removeItem(
-              GUEST_KEY,
-            );
-
-            setIsGuest(false);
-          }
-
-          setCheckingAuth(false);
-        },
-      );
+    } = supabase.auth.onAuthStateChange(
+      (_event, newSession) => {
+        setSession(newSession);
+        setCheckingAuth(false);
+      }
+    );
 
     return () => {
       mounted = false;
@@ -235,13 +156,6 @@ export default function TabLayout() {
 
   /*
    * AUTH REDIRECT
-   *
-   * IMPORTANT:
-   * Read sessionStorage directly before
-   * redirecting.
-   *
-   * This fixes the first-time Guest Login
-   * race condition.
    */
   useEffect(() => {
     if (checkingAuth) {
@@ -249,52 +163,21 @@ export default function TabLayout() {
     }
 
     /*
-     * Always get the latest Guest Mode
-     * directly from sessionStorage on Web.
+     * No session:
+     * allow Login + Admin Sign Up.
      */
-    let guestMode = isGuest;
-
-    if (
-      Platform.OS === 'web' &&
-      typeof window !== 'undefined' &&
-      typeof window.sessionStorage !==
-        'undefined'
-    ) {
-      guestMode =
-        window.sessionStorage.getItem(
-          GUEST_KEY,
-        ) === 'true';
-
-      /*
-       * Keep React state synchronized.
-       */
-      if (guestMode !== isGuest) {
-        setIsGuest(guestMode);
-      }
-    }
-
-    /*
-     * No real session
-     * AND no Guest Mode
-     * AND not a public page
-     *
-     * -> Login
-     */
-    if (
-      !session &&
-      !guestMode &&
-      !isPublicPage
-    ) {
+    if (!session && !isPublicPage) {
       router.replace('/login');
       return;
     }
 
     /*
-     * ONLY a real Supabase session
-     * redirects Login -> Home.
+     * Logged-in user:
+     * Login page -> Home.
      *
-     * Guest users are allowed to open
-     * Login page.
+     * IMPORTANT:
+     * Do NOT redirect /admin-signup.
+     * This allows the admin request page to open.
      */
     if (
       session &&
@@ -304,7 +187,6 @@ export default function TabLayout() {
     }
   }, [
     session,
-    isGuest,
     checkingAuth,
     isPublicPage,
     pathname,
@@ -356,21 +238,14 @@ export default function TabLayout() {
         headerShown: false,
 
         tabBarActiveTintColor: '#C62828',
-
         tabBarInactiveTintColor: '#777777',
 
         /*
-         * LOGIN / ADMIN SIGNUP
-         *
-         * Bottom navigation completely hidden.
-         *
-         * Other pages keep the existing
-         * navigation design.
+         * Hide bottom tab bar on public pages.
          */
         tabBarStyle: isPublicPage
           ? {
               display: 'none',
-              height: 0,
             }
           : {
               height: 72,
@@ -401,7 +276,7 @@ export default function TabLayout() {
       }}
     >
       {/* =========================
-          MAIN NAVIGATION
+          HOME
           ========================= */}
 
       <Tabs.Screen
@@ -417,6 +292,10 @@ export default function TabLayout() {
         }}
       />
 
+      {/* =========================
+          NEWS
+          ========================= */}
+
       <Tabs.Screen
         name="news"
         options={{
@@ -429,6 +308,10 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* =========================
+          ACTIVITY
+          ========================= */}
 
       <Tabs.Screen
         name="activities"
@@ -443,6 +326,10 @@ export default function TabLayout() {
         }}
       />
 
+      {/* =========================
+          BRANCH
+          ========================= */}
+
       <Tabs.Screen
         name="branches"
         options={{
@@ -455,6 +342,10 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* =========================
+          MORE
+          ========================= */}
 
       <Tabs.Screen
         name="more"
@@ -469,7 +360,7 @@ export default function TabLayout() {
       />
 
       {/* =========================
-          HIDDEN / INTERNAL ROUTES
+          HIDDEN PAGES
           ========================= */}
 
       <Tabs.Screen
@@ -535,6 +426,11 @@ export default function TabLayout() {
         }}
       />
 
+      {/* =========================
+          ABOUT
+          HIDDEN FROM NAVIGATION
+          ========================= */}
+
       <Tabs.Screen
         name="about"
         options={{
@@ -570,12 +466,20 @@ export default function TabLayout() {
         }}
       />
 
+      {/* =========================
+          LOGIN
+          ========================= */}
+
       <Tabs.Screen
         name="login"
         options={{
           href: null,
         }}
       />
+
+      {/* =========================
+          ADMIN SIGN UP
+          ========================= */}
 
       <Tabs.Screen
         name="admin-signup"

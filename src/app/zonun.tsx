@@ -1,5 +1,6 @@
 import {
     ActivityIndicator,
+    Linking,
     Alert,
     Pressable,
     RefreshControl,
@@ -236,6 +237,13 @@ export default function ZonunScreen() {
 
                   </View>
 
+                  <Pressable
+                    style={styles.downloadButton}
+                    onPress={() => Linking.openURL(item.pdf_url)}
+                  >
+                    <Text style={styles.downloadText}>DOWNLOAD PDF ↓</Text>
+                  </Pressable>
+
 
                 </View>
 
@@ -407,6 +415,10 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 
+
+  downloadButton: { marginTop: 9, borderWidth: 1, borderColor: '#C62828', borderRadius: 10, minHeight: 40, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+
+  downloadText: { color: '#C62828', fontSize: 11, fontWeight: '900' },
 
   readButton: {
     marginTop: 10,

@@ -266,49 +266,6 @@ export default function MoreScreen() {
         </Text>
       </Pressable>
 
-      {/* Waste Fee */}
-      <Pressable
-        style={({ pressed }) => [
-          styles.menuCard,
-          styles.featureCard,
-          pressed && styles.menuCardPressed,
-        ]}
-        onPress={() => router.push('/waste-fee')}
-      >
-        <LinearGradient
-          colors={['#D32F2F', '#8E1B1B']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.featureIconBox}
-        >
-          <Text style={styles.featureIcon}>
-            🗑️
-          </Text>
-        </LinearGradient>
-
-        <View style={styles.menuContent}>
-          <View style={styles.titleWithTag}>
-            <Text style={styles.menuTitle}>
-              Bawhhlawh Paih Man
-            </Text>
-
-            <View style={styles.serviceTag}>
-              <Text style={styles.serviceTagText}>
-                SERVICE
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.menuText}>
-            Waste collection fee and payment history
-          </Text>
-        </View>
-
-        <Text style={styles.arrow}>
-          ›
-        </Text>
-      </Pressable>
-
       {/* Notifications */}
       <Pressable
         style={({ pressed }) => [
