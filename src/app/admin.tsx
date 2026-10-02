@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -157,10 +157,16 @@ const LEGACY_SECTION_POSITION_MAP: Record<string, string> = {
   'Assistant Secretary': 'Assistant Secretary',
   Treasurer: 'Treasurer',
   'Assistant Treasurer': 'Finance Secretary',
+  'Financial Secretary': 'Finance Secretary',
 };
 
 function normalizeSectionLeaderPosition(position: string) {
   return LEGACY_SECTION_POSITION_MAP[position] ?? position;
+}
+
+// Section Hruaitu positions use these exact canonical labels in both UI and database.
+function sectionLeaderDatabasePosition(position: string) {
+  return normalizeSectionLeaderPosition(position);
 }
 
 function normalizeSectionName(section: string) {
@@ -498,6 +504,7 @@ function getZonunStoragePathFromUrl(url?: string | null) {
 
 export default function AdminScreen() {
   const [loading, setLoading] = useState(true);
+  const loadGeneration = useRef(0);
   const [refreshing, setRefreshing] = useState(false);
   const [authorized, setAuthorized] = useState(false);
   const [adminRole, setAdminRole] = useState<
@@ -604,7 +611,7 @@ export default function AdminScreen() {
     useState('Salem YMA Branch');
   const [eventImage, setEventImage] = useState('');
   const [eventDateValue, setEventDateValue] =
-    useState<Date | null>(null);
+    useState<Date | null>(new Date());
   const [editingEventId, setEditingEventId] =
     useState<number | null>(null);
   const [savingEvent, setSavingEvent] = useState(false);
@@ -1159,6 +1166,7 @@ export default function AdminScreen() {
   }
 
   async function loadAll() {
+    const generation = ++loadGeneration.current;
     try {
       const {
         data: { session },
@@ -1307,6 +1315,8 @@ export default function AdminScreen() {
             ascending: false,
           }),
       ]);
+
+      if (generation !== loadGeneration.current) return;
 
       if (!membersResult.error) {
         setMembers(
@@ -1690,7 +1700,7 @@ export default function AdminScreen() {
     setEventLocation('');
     setEventBranch('Salem YMA Branch');
     setEventImage('');
-    setEventDateValue(null);
+    setEventDateValue(new Date());
     setEditingEventId(null);
     setShowEventDatePicker(false);
     setShowEventTimePicker(false);
@@ -1788,6 +1798,7 @@ export default function AdminScreen() {
 
     try {
       setSavingEvent(true);
+      loadGeneration.current += 1;
 
       const payload = {
         title: eventTitle.trim(),
@@ -2437,13 +2448,36 @@ export default function AdminScreen() {
   async function saveSectionLeader() {
     if (!sectionLeaderFullName.trim()) { Alert.alert('Missing name','Please enter the leader name.'); return; }
     const positionOrder=SECTION_LEADER_POSITIONS.indexOf(sectionLeaderPosition)+1; const order=editingSectionLeaderId?Number(sectionLeaderDisplayOrder):positionOrder; if (!Number.isInteger(order)||order<1||order>6) { Alert.alert('Invalid position order','Position order must be between 1 and 6.'); return; }
-    const duplicatePosition=sectionLeaders.find(i=>i.section===sectionLeaderSection&&i.position===sectionLeaderPosition&&i.id!==editingSectionLeaderId); if(duplicatePosition){Alert.alert('Position already used',`${sectionLeaderPosition} already exists in ${sectionLeaderSection}.`);return;}
+    const duplicatePosition=sectionLeaders.find(i=>i.section===sectionLeaderSection&&normalizeSectionLeaderPosition(i.position)===normalizeSectionLeaderPosition(sectionLeaderPosition)&&i.id!==editingSectionLeaderId); if(duplicatePosition){Alert.alert('Position already used',`${sectionLeaderPosition} already exists in ${sectionLeaderSection}.`);return;}
     const duplicateOrder=sectionLeaders.find(i=>i.section===sectionLeaderSection&&i.display_order===order&&i.id!==editingSectionLeaderId); if(duplicateOrder){Alert.alert('Position order already used',`Position order ${order} is already assigned in ${sectionLeaderSection}.`);return;}
-    try { setSavingSectionLeader(true); const payload={section:sectionLeaderSection,position:sectionLeaderPosition,full_name:sectionLeaderFullName.trim(),phone:sectionLeaderPhone.trim()||null,photo_url:sectionLeaderPhoto||null,display_order:order,is_active:sectionLeaderActive};
+    try { setSavingSectionLeader(true); loadGeneration.current += 1; const payload={section:normalizeSectionName(sectionLeaderSection),position:sectionLeaderDatabasePosition(sectionLeaderPosition),full_name:sectionLeaderFullName.trim(),phone:sectionLeaderPhone.trim()||null,photo_url:sectionLeaderPhoto||null,display_order:order,is_active:sectionLeaderActive};
       if(editingSectionLeaderId){const{error}=await supabase.from('section_leaders').update(payload).eq('id',editingSectionLeaderId);if(error)throw error;setSectionLeaders(current=>current.map(item=>item.id===editingSectionLeaderId?{...item,...payload}:item));Alert.alert('Updated','Section leader updated successfully.');}
-      else{const{error}=await supabase.from('section_leaders').insert(payload);if(error)throw error;const localItem: SectionLeader={id:Date.now(),...payload};setSectionLeaders(current=>[...current,localItem]);Alert.alert('Added','Section leader added successfully.');}
+      else{
+        const { error } = await supabase
+          .from('section_leaders')
+          .insert(payload);
+        if (error) {
+          console.error('[Section Hruaitu] Supabase insert failed:', error);
+          throw error;
+        }
+        // Do not use insert().select() here: a SELECT/RLS restriction can make
+        // an otherwise successful INSERT look like a failed add. The form is
+        // already holding the exact values, so show the new leader locally.
+        const localItem: SectionLeader = {
+          id: Date.now(),
+          section: normalizeSectionName(payload.section),
+          position: normalizeSectionLeaderPosition(sectionLeaderPosition),
+          full_name: payload.full_name,
+          phone: payload.phone,
+          photo_url: payload.photo_url,
+          display_order: payload.display_order,
+          is_active: payload.is_active,
+        };
+        setSectionLeaders(current => [...current, localItem]);
+        Alert.alert('Added','Section leader added successfully.');
+      }
       resetSectionLeaderForm();
-    } catch(error:any){Alert.alert('Save failed',error?.message || 'Unable to save section leader.');} finally {setSavingSectionLeader(false);}
+    } catch(error:any){ console.error('[Section Hruaitu] Save failed:', error); Alert.alert('Save failed',error?.message || 'Unable to save section leader.'); } finally {setSavingSectionLeader(false);}
   }
   async function toggleSectionLeader(item: SectionLeader) { try {const{error}=await supabase.from('section_leaders').update({is_active:!item.is_active}).eq('id',item.id);if(error)throw error;await loadAll();}catch(error:any){Alert.alert('Update failed',error?.message || 'Unable to change section leader visibility.');} }
   async function deleteSectionLeader(item: SectionLeader) {
@@ -4490,7 +4524,7 @@ export default function AdminScreen() {
                 Event Date & Time
               </Text>
 
-              <View
+              {Platform.OS !== 'web' && <View
                 style={
                   styles.dateTimeRow
                 }
@@ -4580,7 +4614,7 @@ export default function AdminScreen() {
                     </Text>
                   </View>
                 </Pressable>
-              </View>
+              </View>}
 
               {eventDateValue && (
                 <View
