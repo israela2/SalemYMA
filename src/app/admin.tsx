@@ -1,6 +1,5 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
-import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
@@ -275,30 +274,74 @@ function getStoragePathFromUrl(url?: string | null) {
   );
 }
 
-async function uploadImage(uri: string, folder: string) {
-  const file = new File(uri);
-  const arrayBuffer = await file.arrayBuffer();
+async function ensureImageLibraryPermission() {
+  // Browsers use the native file picker directly and do not need the
+  // native media-library permission prompt.
+  if (Platform.OS === 'web') return true;
 
-  const extension =
+  const permission =
+    await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+  if (!permission.granted) {
+    Alert.alert(
+      'Permission required',
+      'Please allow photo library access.',
+    );
+    return false;
+  }
+
+  return true;
+}
+
+async function uploadImage(uri: string, folder: string) {
+  let arrayBuffer: ArrayBuffer;
+  let extension =
     uri.toLowerCase().includes('.png')
       ? 'png'
       : uri.toLowerCase().includes('.webp')
         ? 'webp'
         : 'jpg';
+  let contentType = extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg';
+
+  // On Expo Web, ImagePicker returns a browser blob/object URL.
+  // The native File(uri) API cannot read that URL, so fetch the blob first.
+  if (Platform.OS === 'web') {
+    const response = await fetch(uri);
+    if (!response.ok) {
+      throw new Error(`Unable to read selected image (${response.status}).`);
+    }
+    const blob = await response.blob();
+    arrayBuffer = await blob.arrayBuffer();
+    if (blob.type) {
+      contentType = blob.type;
+      if (blob.type === 'image/png') extension = 'png';
+      else if (blob.type === 'image/webp') extension = 'webp';
+      else if (blob.type === 'image/jpeg') extension = 'jpg';
+    }
+  } else {
+    const response = await fetch(uri);
+    if (!response.ok) {
+      throw new Error('Unable to read the selected image.');
+    }
+    const blob = await response.blob();
+    arrayBuffer = await blob.arrayBuffer();
+    if (blob.type) {
+      contentType = blob.type;
+      if (blob.type === 'image/png') extension = 'png';
+      else if (blob.type === 'image/webp') extension = 'webp';
+      else if (blob.type === 'image/jpeg') extension = 'jpg';
+    }
+  }
 
   const fileName = `${Date.now()}-${Math.random()
     .toString(36)
     .substring(2, 9)}.${extension}`;
-
   const path = `${folder}/${fileName}`;
 
   const { error } = await supabase.storage
     .from('gallery')
     .upload(path, arrayBuffer, {
-      contentType:
-        extension === 'png'
-          ? 'image/png'
-          : 'image/jpeg',
+      contentType,
       upsert: false,
     });
 
@@ -356,8 +399,16 @@ async function uploadZonunPdf(uri: string) {
 }
 
 async function uploadCemeteryDocument(uri: string) {
-  const file = new File(uri);
-  const arrayBuffer = await file.arrayBuffer();
+  // DocumentPicker returns a URI that is safest to read through fetch on both
+  // web (blob/object URL) and native (cached document URI).
+  const response = await fetch(uri);
+  if (!response.ok) {
+    throw new Error('Unable to read the selected PDF file.');
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+    throw new Error('The selected PDF is empty or could not be read.');
+  }
 
   const fileName = `${Date.now()}-${Math.random()
     .toString(36)
@@ -616,16 +667,7 @@ export default function AdminScreen() {
   }
 
   async function pickProfilePhoto() {
-    const permission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert(
-        'Permission required',
-        'Please allow photo library access.',
-      );
-      return;
-    }
+    if (!(await ensureImageLibraryPermission())) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -1344,16 +1386,7 @@ export default function AdminScreen() {
   }
 
   async function pickNewsImage() {
-    const permission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert(
-        'Permission required',
-        'Please allow photo library access.',
-      );
-      return;
-    }
+    if (!(await ensureImageLibraryPermission())) return;
 
     const result =
       await ImagePicker.launchImageLibraryAsync({
@@ -1390,16 +1423,7 @@ export default function AdminScreen() {
   }
 
   async function pickEventImage() {
-    const permission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert(
-        'Permission required',
-        'Please allow photo library access.',
-      );
-      return;
-    }
+    if (!(await ensureImageLibraryPermission())) return;
 
     const result =
       await ImagePicker.launchImageLibraryAsync({
@@ -1436,16 +1460,7 @@ export default function AdminScreen() {
   }
 
   async function pickGalleryImage() {
-    const permission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert(
-        'Permission required',
-        'Please allow photo library access.',
-      );
-      return;
-    }
+    if (!(await ensureImageLibraryPermission())) return;
 
     const result =
       await ImagePicker.launchImageLibraryAsync({
@@ -2391,16 +2406,7 @@ export default function AdminScreen() {
   }
 
   async function pickLeaderPhoto() {
-    const permission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert(
-        'Permission required',
-        'Please allow photo library access.',
-      );
-      return;
-    }
+    if (!(await ensureImageLibraryPermission())) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -2559,7 +2565,7 @@ export default function AdminScreen() {
     setSectionLeaderSection(item.section); setSectionLeaderPosition(item.position); setSectionLeaderFullName(item.full_name); setSectionLeaderPhone(item.phone || ''); setSectionLeaderPhoto(item.photo_url || ''); setSectionLeaderDisplayOrder(String(item.display_order || 1)); setSectionLeaderActive(item.is_active !== false); setEditingSectionLeaderId(item.id); setSection('section-leaders');
   }
   async function pickSectionLeaderPhoto() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync(); if (!permission.granted) { Alert.alert('Permission required','Please allow photo library access.'); return; }
+    if (!(await ensureImageLibraryPermission())) return;
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes:['images'], allowsEditing:true, aspect:[1,1], quality:0.9 }); if (result.canceled || !result.assets?.[0]?.uri) return;
     try { setSavingSectionLeader(true); setSectionLeaderPhoto(await uploadImage(result.assets[0].uri,'section-leaders')); } catch(error:any) { Alert.alert('Upload failed',error?.message || 'Unable to upload section leader photo.'); } finally { setSavingSectionLeader(false); }
   }
@@ -2904,16 +2910,7 @@ export default function AdminScreen() {
   }
 
   async function pickCemeteryPhoto() {
-    const permission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert(
-        'Permission required',
-        'Please allow photo library access.',
-      );
-      return;
-    }
+    if (!(await ensureImageLibraryPermission())) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],

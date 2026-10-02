@@ -2,6 +2,7 @@ import {
   Alert,
   Image,
   Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -108,15 +109,16 @@ export default function ProfileScreen() {
 
   async function chooseProfilePhoto() {
     try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permission.granted) {
-        Alert.alert(
-          'Permission required',
-          'Please allow photo library permission to choose your personal photo.',
-        );
-        return;
+      if (Platform.OS !== 'web') {
+        const permission =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert(
+            'Permission required',
+            'Please allow photo library permission to choose your personal photo.',
+          );
+          return;
+        }
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -124,7 +126,6 @@ export default function ProfileScreen() {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.85,
-        base64: true,
       });
 
       if (result.canceled || !result.assets?.length) {
@@ -133,10 +134,7 @@ export default function ProfileScreen() {
 
       const asset = result.assets[0];
 
-      await uploadProfilePhoto(
-        asset.uri,
-        asset.base64,
-      );
+      await uploadProfilePhoto(asset.uri);
     } catch (error: any) {
       console.log('Photo picker error:', error);
 
@@ -152,10 +150,7 @@ export default function ProfileScreen() {
   // UPLOAD PERSONAL PHOTO
   // --------------------------------------------------
 
-  async function uploadProfilePhoto(
-    uri: string,
-    base64?: string | null,
-  ) {
+  async function uploadProfilePhoto(uri: string) {
     try {
       setUploadingPhoto(true);
 
@@ -169,32 +164,25 @@ export default function ProfileScreen() {
         );
       }
 
-      if (!base64) {
-        throw new Error(
-          'Unable to read the selected photo. Please select the photo again.',
-        );
+      // Read the selected image the same way on web (blob URL) and native
+      // (cached file URI). This avoids relying on picker base64 support.
+      const response = await fetch(uri);
+      if (!response.ok) {
+        throw new Error('Unable to read the selected photo.');
       }
-
-      // Convert Base64 → Uint8Array
-      const binaryString =
-        globalThis.atob(base64);
-
-      const bytes = new Uint8Array(
-        binaryString.length,
-      );
-
-      for (
-        let i = 0;
-        i < binaryString.length;
-        i++
-      ) {
-        bytes[i] =
-          binaryString.charCodeAt(i);
-      }
+      const blob = await response.blob();
+      const bytes = await blob.arrayBuffer();
+      const contentType = blob.type || 'image/jpeg';
+      const extension =
+        contentType === 'image/png'
+          ? 'png'
+          : contentType === 'image/webp'
+            ? 'webp'
+            : 'jpg';
 
       // Each member gets a separate folder.
       const fileName =
-        `${user.id}/profile-${Date.now()}.jpg`;
+        `${user.id}/profile-${Date.now()}.${extension}`;
 
       console.log(
         'Uploading profile photo:',
@@ -208,8 +196,7 @@ export default function ProfileScreen() {
             fileName,
             bytes,
             {
-              contentType:
-                'image/jpeg',
+              contentType,
               cacheControl: '3600',
               upsert: true,
             },
