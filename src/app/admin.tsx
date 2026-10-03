@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -31,7 +31,15 @@ type Member = {
   email?: string | null;
   section?: string | null;
   branch_name?: string | null;
+  house_number?: string | null;
   status?: string | null;
+  created_at?: string | null;
+};
+
+type GalleryAlbum = {
+  id: number;
+  title: string;
+  description?: string | null;
   created_at?: string | null;
 };
 
@@ -81,6 +89,7 @@ type WasteBill = {
   payment_method?: string | null;
   payment_utr?: string | null;
   payment_submitted_at?: string | null;
+  house_number?: string | null;
   created_at?: string | null;
 };
 
@@ -237,6 +246,14 @@ async function webConfirm(title: string, message: string): Promise<boolean> {
       { text: 'OK', onPress: () => resolve(true) },
     ]);
   });
+}
+
+function webNotify(title: string, message: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+  Alert.alert(title, message);
 }
 
 function WebEventDateInput({ value, onChange, mode }: { value: Date | null; onChange: (date: Date) => void; mode: 'date' | 'time' }) {
@@ -547,6 +564,12 @@ export default function AdminScreen() {
 
   const [members, setMembers] = useState<Member[]>([]);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [galleryAlbums, setGalleryAlbums] = useState<GalleryAlbum[]>([]);
+  const [newGalleryAlbumTitle, setNewGalleryAlbumTitle] = useState('');
+  const [newGalleryAlbumDescription, setNewGalleryAlbumDescription] = useState('');
+  const [selectedGalleryAlbum, setSelectedGalleryAlbum] = useState('');
+  const [creatingGalleryAlbum, setCreatingGalleryAlbum] = useState(false);
+  const [editingGalleryAlbumId, setEditingGalleryAlbumId] = useState<number | null>(null);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [wasteBills, setWasteBills] = useState<WasteBill[]>([]);
@@ -555,6 +578,8 @@ export default function AdminScreen() {
   const [wastePayeeName, setWastePayeeName] = useState('Salem YMA');
   const [wastePaymentInstructions, setWastePaymentInstructions] = useState('Pay using any UPI app and submit the UTR after payment.');
   const [savingWastePaymentSettings, setSavingWastePaymentSettings] = useState(false);
+  const [featureVisibility, setFeatureVisibility] = useState({ cemetery: false, gas_booking: false });
+  const [savingFeatureVisibility, setSavingFeatureVisibility] = useState(false);
   const [zonun, setZonun] = useState<ZonunItem[]>([]);
 
   const [branchLeaders, setBranchLeaders] = useState<BranchLeader[]>([]);
@@ -622,6 +647,9 @@ export default function AdminScreen() {
     useState<number | null>(null);
   const [savingNews, setSavingNews] = useState(false);
 
+  const [aboutContent, setAboutContent] = useState('');
+  const [savingAbout, setSavingAbout] = useState(false);
+
   const [eventTitle, setEventTitle] = useState('');
   const [eventDescription, setEventDescription] =
     useState('');
@@ -642,6 +670,8 @@ export default function AdminScreen() {
 
   const [galleryUploading, setGalleryUploading] =
     useState(false);
+  const [galleryUploadProgress, setGalleryUploadProgress] =
+    useState({ current: 0, total: 0 });
 
   const [wasteMemberId, setWasteMemberId] = useState('');
   const [wasteAccountNo, setWasteAccountNo] =
@@ -670,6 +700,7 @@ export default function AdminScreen() {
     | 'dashboard'
     | 'members'
     | 'news'
+    | 'about'
     | 'events'
     | 'gallery'
     | 'waste'
@@ -680,7 +711,42 @@ export default function AdminScreen() {
     | 'gas'
     | 'admins'
     | 'profile'
+    | 'visibility'
   >('dashboard');
+
+  useEffect(() => {
+    if (authorized && adminRole === 'full_admin') loadFeatureVisibility();
+  }, [authorized, adminRole]);
+
+  async function loadFeatureVisibility() {
+    const { data, error } = await supabase
+      .from('app_feature_visibility')
+      .select('feature_key, is_visible');
+    if (error) return; // Keep unavailable services hidden until settings are configured.
+    const next = { cemetery: false, gas_booking: false };
+    for (const row of data || []) {
+      if (row.feature_key === 'cemetery') next.cemetery = !!row.is_visible;
+      if (row.feature_key === 'gas_booking') next.gas_booking = !!row.is_visible;
+    }
+    setFeatureVisibility(next);
+  }
+
+  async function saveFeatureVisibility(key: 'cemetery' | 'gas_booking', value: boolean) {
+    const previous = featureVisibility[key];
+    setFeatureVisibility(current => ({ ...current, [key]: value }));
+    setSavingFeatureVisibility(true);
+    const { error } = await supabase.from('app_feature_visibility').upsert(
+      { feature_key: key, is_visible: value, updated_at: new Date().toISOString() },
+      { onConflict: 'feature_key' },
+    );
+    setSavingFeatureVisibility(false);
+    if (error) {
+      setFeatureVisibility(current => ({ ...current, [key]: previous }));
+      Alert.alert('Save failed', 'Run the supplied SQL setup first, then try again.');
+    } else {
+      Alert.alert('Saved', `${key === 'cemetery' ? 'Thlanmual Records' : 'Gas Booking'} is now ${value ? 'shown' : 'hidden'} for users.`);
+    }
+  }
 
   async function checkAdmin(userId: string): Promise<AdminAccount | null> {
     const { data, error } = await supabase
@@ -1378,12 +1444,30 @@ export default function AdminScreen() {
           galleryResult.data || [],
         );
       }
+      const { data: albumRows, error: albumError } = await supabase
+        .from('gallery_albums')
+        .select('id, title, description, created_at')
+        .order('created_at', { ascending: false });
+      if (!albumError) {
+        const loadedAlbums = (albumRows || []) as GalleryAlbum[];
+        setGalleryAlbums(loadedAlbums);
+        if (loadedAlbums.length && !loadedAlbums.some((album) => album.title === selectedGalleryAlbum)) {
+          setSelectedGalleryAlbum(loadedAlbums[0].title);
+        }
+      }
 
       if (!newsResult.error) {
         setNews(
           newsResult.data || [],
         );
       }
+
+      const { data: aboutRow } = await supabase
+        .from('branch_info')
+        .select('about_content')
+        .eq('id', 1)
+        .maybeSingle();
+      setAboutContent(aboutRow?.about_content || '');
 
       if (!eventsResult.error) {
         setEvents(
@@ -1493,6 +1577,24 @@ export default function AdminScreen() {
     loadAll();
   }, []);
 
+  // Refresh Admin data whenever this screen becomes active again.
+  // This keeps the member list in sync after deleting/editing a member.
+  useFocusEffect(
+    React.useCallback(() => {
+      loadAll();
+    }, []),
+  );
+
+  // Reload the member list whenever Admin screen regains focus.
+  // This ensures a member deleted from Member Edit disappears immediately.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!loading) {
+        loadAll();
+      }
+    }, []),
+  );
+
   async function refresh() {
     setRefreshing(true);
     await loadAll();
@@ -1572,56 +1674,201 @@ export default function AdminScreen() {
     }
   }
 
+  async function createGalleryAlbum() {
+    const title = newGalleryAlbumTitle.trim();
+    if (!title) {
+      Alert.alert('Album name required', 'Enter a name for the new album.');
+      return;
+    }
+    setCreatingGalleryAlbum(true);
+    try {
+      if (editingGalleryAlbumId !== null) {
+        const oldAlbum = galleryAlbums.find((album) => album.id === editingGalleryAlbumId);
+        const { data, error } = await supabase
+          .from('gallery_albums')
+          .update({ title, description: newGalleryAlbumDescription.trim() || null })
+          .eq('id', editingGalleryAlbumId)
+          .select('id, title, description, created_at')
+          .single();
+        if (error) throw error;
+        if (oldAlbum && oldAlbum.title !== title) {
+          const { error: photoError } = await supabase.from('gallery').update({ category: title }).eq('category', oldAlbum.title);
+          if (photoError) throw photoError;
+        }
+        setGalleryAlbums((current) => current.map((album) => album.id === editingGalleryAlbumId ? data as GalleryAlbum : album));
+        setSelectedGalleryAlbum(title);
+        setEditingGalleryAlbumId(null);
+        Alert.alert('Album updated', `“${title}” has been updated.`);
+      } else {
+        const { data, error } = await supabase
+          .from('gallery_albums')
+          .insert({ title, description: newGalleryAlbumDescription.trim() || null })
+          .select('id, title, description, created_at')
+          .single();
+        if (error) throw error;
+        setGalleryAlbums((current) => [data as GalleryAlbum, ...current]);
+        setSelectedGalleryAlbum(title);
+        Alert.alert('Album created', `“${title}” is ready for photos.`);
+      }
+      setNewGalleryAlbumTitle('');
+      setNewGalleryAlbumDescription('');
+    } catch (error: any) {
+      Alert.alert('Could not save album', error?.message || 'Please try again.');
+    } finally {
+      setCreatingGalleryAlbum(false);
+    }
+  }
+
+  function editGalleryAlbum(album: GalleryAlbum) {
+    setEditingGalleryAlbumId(album.id);
+    setNewGalleryAlbumTitle(album.title);
+    setNewGalleryAlbumDescription(album.description || '');
+  }
+
+  async function deleteGalleryAlbum(album: GalleryAlbum) {
+    const confirmed = await webConfirm(
+      'Delete album?',
+      `“${album.title}” and the photos assigned to it will be removed permanently.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      // Delete the database rows first. Storage cleanup is best-effort so a
+      // storage-policy/network issue cannot leave the album stuck undeleted.
+      const { data: photos, error: photoLoadError } = await supabase
+        .from('gallery')
+        .select('id, image_url')
+        .eq('category', album.title);
+      if (photoLoadError) throw photoLoadError;
+
+      const { error: photoDeleteError } = await supabase
+        .from('gallery')
+        .delete()
+        .eq('category', album.title);
+      if (photoDeleteError) throw photoDeleteError;
+
+      const { error: albumDeleteError } = await supabase
+        .from('gallery_albums')
+        .delete()
+        .eq('id', album.id);
+      if (albumDeleteError) throw albumDeleteError;
+
+      setGalleryAlbums((current) => current.filter((item) => item.id !== album.id));
+      if (selectedGalleryAlbum === album.title) {
+        const remaining = galleryAlbums.find((item) => item.id !== album.id);
+        setSelectedGalleryAlbum(remaining?.title || '');
+      }
+      if (editingGalleryAlbumId === album.id) {
+        setEditingGalleryAlbumId(null);
+        setNewGalleryAlbumTitle('');
+        setNewGalleryAlbumDescription('');
+      }
+
+      let storageCleanupFailed = false;
+      for (const photo of photos || []) {
+        const path = getStoragePathFromUrl(photo.image_url);
+        if (!path) continue;
+        try {
+          const { error: storageError } = await supabase.storage
+            .from('gallery')
+            .remove([path]);
+          if (storageError) storageCleanupFailed = true;
+        } catch {
+          storageCleanupFailed = true;
+        }
+      }
+
+      await loadAll();
+      webNotify(
+        'Album deleted',
+        storageCleanupFailed
+          ? 'The album and its photo records were deleted, but some stored image files could not be removed. Check Storage permissions in Supabase.'
+          : `“${album.title}” and its photos were deleted.`,
+      );
+    } catch (error: any) {
+      webNotify('Delete failed', error?.message || 'Unable to delete album. Check your admin permissions and Supabase policies.');
+    }
+  }
+
   async function pickGalleryImage() {
+    if (galleryUploading) return;
     if (!(await ensureImageLibraryPermission())) return;
 
-    const result =
-      await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.85,
-      });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      // Editing is not supported when selecting multiple images.
+      quality: 0.85,
+      selectionLimit: 0,
+    });
 
-    if (
-      result.canceled ||
-      !result.assets?.[0]?.uri
-    ) {
+    if (result.canceled || !result.assets?.length) return;
+
+    const assets = result.assets.filter((asset) => !!asset.uri);
+    if (!assets.length) {
+      webNotify('No photos selected', 'Please select one or more photos and try again.');
       return;
     }
 
+    setGalleryUploading(true);
+    setGalleryUploadProgress({ current: 0, total: assets.length });
+    let uploadedCount = 0;
+    const failures: string[] = [];
+
     try {
-      setGalleryUploading(true);
+      // Upload sequentially to avoid overwhelming the device or Storage service.
+      for (let index = 0; index < assets.length; index += 1) {
+        const asset = assets[index];
+        setGalleryUploadProgress({ current: index + 1, total: assets.length });
 
-      const url = await uploadImage(
-        result.assets[0].uri,
-        'gallery',
-      );
-
-      const { error } = await supabase
-        .from('gallery')
-        .insert({
-          title: 'Salem YMA',
-          image_url: url,
-          category: 'General',
-          media_type: 'photo',
-        });
-
-      if (error) throw error;
-
-      Alert.alert(
-        'Success',
-        'Photo added to Gallery.',
-      );
+        try {
+          const url = await uploadImage(asset.uri, 'gallery');
+          const { error } = await supabase.from('gallery').insert({
+            title: selectedGalleryAlbum,
+            image_url: url,
+            category: selectedGalleryAlbum,
+            media_type: 'photo',
+          });
+          if (error) throw error;
+          uploadedCount += 1;
+        } catch (error: any) {
+          failures.push(`Photo ${index + 1}: ${error?.message || 'Upload failed'}`);
+        }
+      }
 
       await loadAll();
-    } catch (error: any) {
-      Alert.alert(
-        'Upload failed',
-        error?.message ||
-          'Unable to add gallery photo.',
-      );
+
+      if (failures.length === 0) {
+        webNotify(
+          'Photos uploaded',
+          `${uploadedCount} photo${uploadedCount === 1 ? '' : 's'} added to the “${selectedGalleryAlbum}” album.`,
+        );
+      } else {
+        const summary = `${uploadedCount} of ${assets.length} photos uploaded successfully. ${failures.length} failed.\n\n${failures.slice(0, 3).join('\n')}`;
+        webNotify('Upload partially completed', summary);
+      }
     } finally {
       setGalleryUploading(false);
+      setGalleryUploadProgress({ current: 0, total: 0 });
+    }
+  }
+
+  async function saveAbout() {
+    if (!aboutContent.trim()) {
+      Alert.alert('Missing content', 'Please enter Salem YMA Chanchin.');
+      return;
+    }
+    setSavingAbout(true);
+    try {
+      const { error } = await supabase
+        .from('branch_info')
+        .upsert({ id: 1, about_content: aboutContent.trim(), updated_at: new Date().toISOString() });
+      if (error) throw error;
+      Alert.alert('Updated', 'Salem YMA Chanchin updated successfully.');
+    } catch (error: any) {
+      Alert.alert('Update failed', error?.message || 'Unable to update Salem YMA Chanchin.');
+    } finally {
+      setSavingAbout(false);
     }
   }
 
@@ -1932,53 +2179,39 @@ export default function AdminScreen() {
     }
   }
 
-  async function deleteGalleryItem(
-    item: GalleryItem,
-  ) {
-    Alert.alert(
+  async function deleteGalleryItem(item: GalleryItem) {
+    const confirmed = await webConfirm(
       'Delete photo?',
-      'This photo will be removed from Gallery.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } =
-                await supabase
-                  .from('gallery')
-                  .delete()
-                  .eq('id', item.id);
-
-              if (error) throw error;
-
-              const storagePath =
-                getStoragePathFromUrl(
-                  item.image_url,
-                );
-
-              if (storagePath) {
-                await supabase.storage
-                  .from('gallery')
-                  .remove([storagePath]);
-              }
-
-              await loadAll();
-            } catch (error: any) {
-              Alert.alert(
-                'Delete failed',
-                error?.message ||
-                  'Unable to delete photo.',
-              );
-            }
-          },
-        },
-      ],
+      'This photo will be removed from Gallery permanently.',
     );
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('gallery')
+        .delete()
+        .eq('id', item.id);
+      if (error) throw error;
+
+      const storagePath = getStoragePathFromUrl(item.image_url);
+      let storageCleanupFailed = false;
+      if (storagePath) {
+        const { error: storageError } = await supabase.storage
+          .from('gallery')
+          .remove([storagePath]);
+        storageCleanupFailed = Boolean(storageError);
+      }
+
+      await loadAll();
+      if (storageCleanupFailed) {
+        webNotify('Photo removed', 'The photo was removed from Gallery, but its stored file could not be deleted. Check Supabase Storage permissions.')
+      }
+    } catch (error: any) {
+      webNotify(
+        'Delete failed',
+        error?.message || 'Unable to delete photo. Check your admin permissions and Supabase policies.',
+      );
+    }
   }
 
   async function saveWastePaymentSettings() {
@@ -1996,8 +2229,8 @@ export default function AdminScreen() {
   }
 
   async function downloadWastePaymentReport() {
-    const rows = wasteBills.map((bill) => { const member = members.find((m) => m.user_id === bill.user_id); return `<tr><td>${member?.full_name || '-'}</td><td>${bill.account_no || '-'}</td><td>${bill.bill_month || '-'}</td><td>₹${Number(bill.amount || 0).toFixed(2)}</td><td>${bill.status || '-'}</td><td>${bill.payment_method || '-'}</td><td>${bill.payment_utr || '-'}</td><td>${bill.receipt_no || '-'}</td><td>${formatDateTime(bill.paid_at || bill.payment_submitted_at || bill.created_at)}</td></tr>`; }).join('');
-    const html = `<html><body style="font-family:Arial;padding:24px"><h1>SALEM YMA — Waste Fee Payment Report</h1><p>Generated ${formatDateTime(new Date().toISOString())}</p><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th>Member</th><th>Account</th><th>Month</th><th>Amount</th><th>Status</th><th>Method</th><th>UTR</th><th>Receipt</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+    const rows = wasteBills.map((bill) => { const member = members.find((m) => m.user_id === bill.user_id); return `<tr><td>${bill.house_number || member?.house_number || '-'}</td><td>${member?.full_name || '-'}</td><td>${bill.account_no || '-'}</td><td>${bill.bill_month || '-'}</td><td>₹${Number(bill.amount || 0).toFixed(2)}</td><td>${bill.status || '-'}</td><td>${bill.payment_method || '-'}</td><td>${bill.payment_utr || '-'}</td><td>${bill.receipt_no || '-'}</td><td>${formatDateTime(bill.paid_at || bill.payment_submitted_at || bill.created_at)}</td></tr>`; }).join('');
+    const html = `<html><body style="font-family:Arial;padding:24px"><h1>SALEM YMA — Waste Fee Payment Report</h1><p>Generated ${formatDateTime(new Date().toISOString())}</p><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th>House No.</th><th>Member</th><th>Account</th><th>Month</th><th>Amount</th><th>Status</th><th>Method</th><th>UTR</th><th>Receipt</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
     try {
       if (Platform.OS === 'web') {
         const printWindow = window.open('', '_blank');
@@ -2035,51 +2268,61 @@ export default function AdminScreen() {
       return;
     }
 
-    const eligibleMembers = members.filter((member) => Boolean(member.user_id));
-    if (!eligibleMembers.length) {
-      Alert.alert('No members found', 'There are no members with a valid user ID.');
+    const householdMembers = members.filter(
+      (member) => Boolean(member.user_id) && Boolean(member.house_number?.trim()),
+    );
+    if (!householdMembers.length) {
+      Alert.alert('No household data', 'Members must have a House Number before Waste Fee bills can be created.');
       return;
     }
 
+    const households = Array.from(
+      new Map(
+        householdMembers.map((member) => [
+          member.house_number!.trim().toLowerCase(),
+          member,
+        ]),
+      ).values(),
+    );
+
     const confirmed = await webConfirm(
-      'Create bills for all members?',
-      `This will create a ₹${amount.toFixed(2)} Waste Fee bill for ${eligibleMembers.length} members for ${billMonth}. Existing bills for the same member and month will be skipped.`,
+      'Create household bills?',
+      `This will create one ₹${amount.toFixed(2)} Waste Fee bill for each of ${households.length} House Numbers for ${billMonth}. Same-household members will share one bill.`,
     );
     if (!confirmed) return;
 
     try {
       setCreatingAllWasteBills(true);
 
-      // Fetch only the selected month. This avoids a very large `.in(userIds)`
-      // request when the membership list grows.
       const { data: existingBills, error: existingError } = await supabase
         .from('waste_bills')
-        .select('user_id, bill_month')
+        .select('user_id, bill_month, house_number')
         .eq('bill_month', billMonth);
 
       if (existingError) throw existingError;
 
-      const existingSet = new Set(
-        (existingBills || []).map((bill) => `${bill.user_id}:${bill.bill_month}`),
+      const existingHouseNumbers = new Set(
+        (existingBills || [])
+          .map((bill: any) => String(bill.house_number || '').trim().toLowerCase())
+          .filter(Boolean),
       );
 
-      const rows = eligibleMembers
-        .filter((member) => !existingSet.has(`${member.user_id}:${billMonth}`))
+      const rows = households
+        .filter((member) => !existingHouseNumbers.has(member.house_number!.trim().toLowerCase()))
         .map((member) => ({
           user_id: member.user_id,
-          account_no: `YMA-${String(member.id).padStart(4, '0')}`,
+          house_number: member.house_number!.trim(),
+          account_no: member.house_number!.trim(),
           bill_month: billMonth,
           amount,
           status: 'unpaid',
         }));
 
       if (!rows.length) {
-        Alert.alert('No new bills', `All ${eligibleMembers.length} members already have a bill for ${billMonth}.`);
+        Alert.alert('No new bills', `Every House Number already has a bill for ${billMonth}.`);
         return;
       }
 
-      // Insert in manageable batches so a larger membership list does not
-      // fail because of one oversized request.
       const batchSize = 100;
       for (let index = 0; index < rows.length; index += batchSize) {
         const batch = rows.slice(index, index + batchSize);
@@ -2088,14 +2331,14 @@ export default function AdminScreen() {
       }
 
       Alert.alert(
-        'Bills created',
-        `Successfully created ${rows.length} Waste Fee bill${rows.length === 1 ? '' : 's'} for ${billMonth}. ${eligibleMembers.length - rows.length} existing bill${eligibleMembers.length - rows.length === 1 ? '' : 's'} skipped.`,
+        'Household bills created',
+        `${rows.length} household Waste Fee bill${rows.length === 1 ? '' : 's'} created for ${billMonth}. Each House Number has one ₹${amount.toFixed(2)} bill.`,
       );
 
       await loadAll();
     } catch (error: any) {
-      console.error('[Waste Fee] Bulk bill creation failed:', error);
-      Alert.alert('Bulk bill error', error?.message || 'Unable to create bills for all members.');
+      console.error('[Waste Fee] Household bill creation failed:', error);
+      Alert.alert('Household bill error', error?.message || 'Unable to create household Waste Fee bills.');
     } finally {
       setCreatingAllWasteBills(false);
     }
@@ -2103,10 +2346,13 @@ export default function AdminScreen() {
 
   async function saveWasteBill() {
     if (!wasteMemberId) {
-      Alert.alert(
-        'Select member',
-        'Please select a member first.',
-      );
+      Alert.alert('Select member', 'Please select a member first.');
+      return;
+    }
+
+    const selectedWasteMember = members.find((member) => member.user_id === wasteMemberId);
+    if (!selectedWasteMember?.house_number?.trim()) {
+      Alert.alert('House Number required', 'This member does not have a House Number. Add it before creating the Waste Fee bill.');
       return;
     }
 
@@ -2145,8 +2391,9 @@ export default function AdminScreen() {
         .from('waste_bills')
         .insert({
           user_id: wasteMemberId,
+          house_number: selectedWasteMember.house_number.trim(),
           account_no:
-            wasteAccountNo.trim() || null,
+            selectedWasteMember.house_number.trim(),
           bill_month:
             wasteBillMonth.trim(),
           amount,
@@ -3115,6 +3362,7 @@ export default function AdminScreen() {
 
     return members.filter((member) => {
       return (
+
         member.full_name
           ?.toLowerCase()
           .includes(query) ||
@@ -3126,10 +3374,23 @@ export default function AdminScreen() {
           .includes(query) ||
         member.section
           ?.toLowerCase()
+          .includes(query) ||
+        member.house_number
+          ?.toLowerCase()
           .includes(query)
       );
     });
   }, [members, memberSearch]);
+
+  // Only the selected album is rendered in Admin Gallery.
+  const selectedAdminAlbum = galleryAlbums.find(
+    (album) => album.title === selectedGalleryAlbum,
+  );
+  const selectedAlbumPhotos = selectedAdminAlbum
+    ? gallery.filter(
+        (item) => (item.category || 'General') === selectedAdminAlbum.title,
+      )
+    : [];
 
   const publishedNews =
     news.filter(
@@ -3261,6 +3522,7 @@ export default function AdminScreen() {
               ['dashboard', 'Dashboard'],
               ['members', 'Members'],
               ['news', 'News'],
+              ['about', 'Salem YMA Chanchin'],
               ['events', 'Events'],
               ['gallery', 'Gallery'],
               ['waste', 'Waste Bills'],
@@ -3270,6 +3532,7 @@ export default function AdminScreen() {
               ['cemetery', 'Thlanmual'],
               ['admins', 'Admin Requests'],
               ['profile', 'My Profile'],
+              ['visibility', 'Show / Hide'],
             ].map(([key, label]) => (
               <Pressable
                 key={key}
@@ -3279,6 +3542,7 @@ export default function AdminScreen() {
                       | 'dashboard'
                       | 'members'
                       | 'news'
+                      | 'about'
                       | 'events'
                       | 'gallery'
                       | 'waste'
@@ -3287,7 +3551,8 @@ export default function AdminScreen() {
                       | 'cemetery'
                       | 'gas'
                       | 'admins'
-                      | 'profile',
+                      | 'profile'
+                      | 'visibility',
                   );
 
                   if (key === 'gas') {
@@ -3475,6 +3740,31 @@ export default function AdminScreen() {
                     Save Profile Changes
                   </Text>
                 )}
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {section === 'visibility' && adminRole === 'full_admin' && (
+          <View>
+            <View style={styles.sectionHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionTitle}>Service Visibility</Text>
+                <Text style={styles.sectionDescription}>Hide unfinished services from users. You can show them again whenever they are ready.</Text>
+              </View>
+            </View>
+            <View style={styles.formCard}>
+              <Text style={styles.formTitle}>Thlanmual Records</Text>
+              <Text style={styles.profileRoleText}>{featureVisibility.cemetery ? 'Visible to users' : 'Hidden from users'}</Text>
+              <Pressable disabled={savingFeatureVisibility} onPress={() => saveFeatureVisibility('cemetery', !featureVisibility.cemetery)} style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>{featureVisibility.cemetery ? 'HIDE THLANMUAL' : 'SHOW THLANMUAL'}</Text>
+              </Pressable>
+            </View>
+            <View style={styles.formCard}>
+              <Text style={styles.formTitle}>Gas Booking</Text>
+              <Text style={styles.profileRoleText}>{featureVisibility.gas_booking ? 'Visible to users' : 'Hidden from users'}</Text>
+              <Pressable disabled={savingFeatureVisibility} onPress={() => saveFeatureVisibility('gas_booking', !featureVisibility.gas_booking)} style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>{featureVisibility.gas_booking ? 'HIDE GAS BOOKING' : 'SHOW GAS BOOKING'}</Text>
               </Pressable>
             </View>
           </View>
@@ -3806,6 +4096,12 @@ export default function AdminScreen() {
                   'news',
                 ],
                 [
+                  'A',
+                  'Salem YMA Chanchin',
+                  'Update branch information',
+                  'about',
+                ],
+                [
                   'E',
                   'Events',
                   'Manage programmes',
@@ -3872,6 +4168,7 @@ export default function AdminScreen() {
                         target as
                           | 'members'
                           | 'news'
+                          | 'about'
                           | 'events'
                           | 'gallery'
                           | 'waste'
@@ -4128,6 +4425,12 @@ export default function AdminScreen() {
                       'No email'}
                   </Text>
 
+                  <Text
+                    style={styles.memberMeta}
+                  >
+                    House No.: {member.house_number || 'Not assigned'}
+                  </Text>
+
                   <View
                     style={styles.memberTags}
                   >
@@ -4207,6 +4510,34 @@ export default function AdminScreen() {
                 </Text>
               </View>
             )}
+          </>
+        )}
+
+        {section === 'about' && (
+          <>
+            <View style={styles.sectionHeaderRow}>
+              <View>
+                <Text style={styles.sectionTitle}>Salem YMA Chanchin</Text>
+                <Text style={styles.sectionDescription}>Update the information shown under More → Salem YMA Chanchin.</Text>
+              </View>
+            </View>
+
+            <View style={styles.formCard}>
+              <Text style={styles.formTitle}>Edit Salem YMA Chanchin</Text>
+              <Text style={styles.label}>Chanchin</Text>
+              <TextInput
+                value={aboutContent}
+                onChangeText={setAboutContent}
+                placeholder="Write Salem YMA Chanchin..."
+                placeholderTextColor="#999999"
+                style={[styles.input, styles.textArea]}
+                multiline
+                textAlignVertical="top"
+              />
+              <Pressable onPress={saveAbout} style={styles.primaryButton} disabled={savingAbout}>
+                {savingAbout ? <ActivityIndicator color={WHITE} /> : <Text style={styles.primaryButtonText}>UPDATE CHANCHIN</Text>}
+              </Pressable>
+            </View>
           </>
         )}
 
@@ -4952,76 +5283,140 @@ export default function AdminScreen() {
               </View>
             </View>
 
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E8E8E8' }}>
+              <Text style={{ color: '#171717', fontSize: 16, fontWeight: '800', marginBottom: 10 }}>{editingGalleryAlbumId !== null ? 'Edit Album' : 'Create Album'}</Text>
+              <TextInput
+                value={newGalleryAlbumTitle}
+                onChangeText={setNewGalleryAlbumTitle}
+                placeholder="Album name (e.g. Annual Meeting 2026)"
+                placeholderTextColor="#8A8A8A"
+                style={{ borderWidth: 1, borderColor: '#DDDDDD', borderRadius: 9, paddingHorizontal: 12, paddingVertical: 11, color: '#171717', marginBottom: 8 }}
+              />
+              <TextInput
+                value={newGalleryAlbumDescription}
+                onChangeText={setNewGalleryAlbumDescription}
+                placeholder="Description (optional)"
+                placeholderTextColor="#8A8A8A"
+                style={{ borderWidth: 1, borderColor: '#DDDDDD', borderRadius: 9, paddingHorizontal: 12, paddingVertical: 11, color: '#171717', marginBottom: 10 }}
+              />
+              <Pressable onPress={createGalleryAlbum} disabled={creatingGalleryAlbum} style={{ backgroundColor: '#8E1B1B', padding: 12, borderRadius: 9, alignItems: 'center' }}>
+                {creatingGalleryAlbum ? <ActivityIndicator color="#FFFFFF" /> : <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>{editingGalleryAlbumId !== null ? 'Save Album' : '+ Create Album'}</Text>}
+              </Pressable>
+            </View>
+
+            <View
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 16,
+                padding: 14,
+                marginBottom: 14,
+                borderWidth: 1,
+                borderColor: '#E8E8E8',
+              }}
+            >
+              <Text style={{ color: '#171717', fontSize: 15, fontWeight: '800', marginBottom: 10 }}>
+                Albums
+              </Text>
+              <Text style={{ color: '#777', fontSize: 12, lineHeight: 18 }}>
+                Each album is shown separately. Photos uploaded to an album stay inside that album.
+              </Text>
+            </View>
+
+            <Text style={{ color: '#171717', fontSize: 15, fontWeight: '800', marginBottom: 8 }}>
+              Upload to Album
+            </Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingBottom: 12 }}
+            >
+              {galleryAlbums.map((album) => (
+                <Pressable
+                  key={album.id}
+                  onPress={() => {
+                    setSelectedGalleryAlbum(album.title);
+                  }}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 9,
+                    borderRadius: 20,
+                    backgroundColor: selectedGalleryAlbum === album.title ? '#8E1B1B' : '#F1F1F1',
+                  }}
+                >
+                  <Text style={{ color: selectedGalleryAlbum === album.title ? '#FFFFFF' : '#333333', fontWeight: '700' }}>
+                    {album.title}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
             <Pressable
               onPress={pickGalleryImage}
               style={styles.galleryUploadButton}
-              disabled={galleryUploading}
+              disabled={galleryUploading || galleryAlbums.length === 0}
             >
               {galleryUploading ? (
-                <ActivityIndicator color={WHITE} />
+                <View style={{ alignItems: 'center', gap: 6 }}>
+                  <ActivityIndicator color={WHITE} />
+                  <Text style={{ color: WHITE, fontWeight: '700', fontSize: 12 }}>
+                    Uploading {galleryUploadProgress.current} of {galleryUploadProgress.total}...
+                  </Text>
+                </View>
               ) : (
                 <>
-                  <Text style={styles.uploadPlus}>
-                    +
-                  </Text>
-
+                  <Text style={styles.uploadPlus}>+</Text>
                   <View>
-                    <Text style={styles.uploadTitle}>
-                      Add Gallery Photo
-                    </Text>
-
+                    <Text style={styles.uploadTitle}>Add Photos</Text>
                     <Text style={styles.uploadSubtitle}>
-                      Choose a photo from your device
+                      {galleryAlbums.length === 0
+                        ? 'Create an album first'
+                        : `Upload to ${selectedGalleryAlbum}`}
                     </Text>
                   </View>
                 </>
               )}
             </Pressable>
 
-            <View style={styles.galleryGrid}>
-              {gallery.map((item) => (
-                <View
-                  key={item.id}
-                  style={styles.galleryCard}
-                >
-                  <Image
-                    source={{
-                      uri: item.image_url,
-                    }}
-                    style={styles.galleryImage}
-                  />
-
-                  <Pressable
-                    onPress={() =>
-                      deleteGalleryItem(item)
-                    }
-                    style={styles.galleryDelete}
-                  >
-                    <Text style={styles.galleryDeleteText}>
-                      ×
-                    </Text>
-                  </Pressable>
-
-                  <View style={styles.galleryCaption}>
-                    <Text
-                      style={styles.galleryCaptionText}
-                      numberOfLines={1}
-                    >
-                      {item.title || 'Salem YMA'}
-                    </Text>
+            <View style={{ marginTop: 8 }}>
+              {selectedAdminAlbum ? (
+                <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#E8E8E8' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                      <Text style={{ color: '#171717', fontSize: 17, fontWeight: '900' }}>{selectedAdminAlbum.title}</Text>
+                      <Text style={{ color: '#777', fontSize: 11, marginTop: 3 }}>{selectedAlbumPhotos.length} {selectedAlbumPhotos.length === 1 ? 'photo' : 'photos'}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <Pressable onPress={() => editGalleryAlbum(selectedAdminAlbum)} style={{ paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, backgroundColor: '#F4F4F4' }}><Text style={{ color: '#8E1B1B', fontWeight: '800', fontSize: 11 }}>EDIT</Text></Pressable>
+                      <Pressable onPress={() => deleteGalleryAlbum(selectedAdminAlbum)} style={{ paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FFF0F0' }}><Text style={{ color: '#B42318', fontWeight: '800', fontSize: 11 }}>DELETE</Text></Pressable>
+                    </View>
                   </View>
+                  {selectedAlbumPhotos.length > 0 ? (
+                    <View style={styles.galleryGrid}>
+                      {selectedAlbumPhotos.map((item) => (
+                        <View key={item.id} style={styles.galleryCard}>
+                          <Image source={{ uri: item.image_url }} style={styles.galleryImage} />
+                          <Pressable onPress={() => deleteGalleryItem(item)} style={styles.galleryDelete}><Text style={styles.galleryDeleteText}>×</Text></Pressable>
+                          <View style={styles.galleryCaption}><Text style={styles.galleryCaptionText} numberOfLines={1}>{item.title || selectedAdminAlbum.title}</Text></View>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={{ minHeight: 130, borderRadius: 12, backgroundColor: '#F7F7F7', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#888', fontSize: 12 }}>No photos in {selectedAdminAlbum.title} yet.</Text></View>
+                  )}
                 </View>
-              ))}
+              ) : (
+                <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Select an album</Text><Text style={styles.emptyText}>Choose Album 1, Album 2, etc. above to view only its photos.</Text></View>
+              )}
             </View>
 
-            {gallery.length === 0 && (
+            {galleryAlbums.length === 0 && (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>
-                  Gallery is empty
+                  No albums yet
                 </Text>
-
                 <Text style={styles.emptyText}>
-                  Upload your first photo above.
+                  Create Album 1, Album 2, Album 3, etc. first, then upload photos into each album.
                 </Text>
               </View>
             )}
@@ -5085,8 +5480,8 @@ export default function AdminScreen() {
             </LinearGradient>
 
             <View style={styles.formCard}>
-              <Text style={styles.formTitle}>Create Bills for All Members</Text>
-              <Text style={styles.sectionDescription}>Set the amount and billing month. One bill will be created for every member with a valid account. Existing bills for the same month are skipped.</Text>
+              <Text style={styles.formTitle}>Create Household Bills</Text>
+              <Text style={styles.sectionDescription}>Set the amount and billing month. One ₹200 bill is created per House Number, not per member. Same-household members share the same Waste Fee bill.</Text>
 
               <Text style={styles.label}>Waste Fee Amount</Text>
               <TextInput
@@ -5115,18 +5510,18 @@ export default function AdminScreen() {
                 {creatingAllWasteBills ? (
                   <ActivityIndicator color={WHITE} />
                 ) : (
-                  <Text style={styles.primaryButtonText}>CREATE WASTE BILL FOR ALL MEMBERS</Text>
+                  <Text style={styles.primaryButtonText}>CREATE ₹200 WASTE BILL PER HOUSEHOLD</Text>
                 )}
               </Pressable>
             </View>
 
             <View style={styles.formCard}>
               <Text style={styles.formTitle}>
-                Create Waste Bill
+                Create Household Waste Bill
               </Text>
 
               <Text style={styles.label}>
-                Member
+                Household Member / House Number
               </Text>
 
               <View style={styles.memberSelectBox}>
@@ -5145,6 +5540,7 @@ export default function AdminScreen() {
                           setWasteMemberId(
                             member.user_id,
                           );
+                          setWasteAccountNo(member.house_number || '');
                         } else {
                           Alert.alert(
                             'Missing User ID',
@@ -5180,7 +5576,7 @@ export default function AdminScreen() {
                         ]}
                         numberOfLines={1}
                       >
-                        {member.email || 'No email'}
+                        House No. {member.house_number || 'Not assigned'}
                       </Text>
                     </Pressable>
                   ))}
@@ -5205,13 +5601,13 @@ export default function AdminScreen() {
               ) : null}
 
               <Text style={styles.label}>
-                Account Number
+                HOUSE NUMBER (AUTO)
               </Text>
 
               <TextInput
                 value={wasteAccountNo}
-                onChangeText={setWasteAccountNo}
-                placeholder="YMA-0001"
+                editable={false}
+                placeholder="House No. 12"
                 placeholderTextColor="#999999"
                 style={styles.input}
               />
@@ -5338,8 +5734,7 @@ export default function AdminScreen() {
                       </Text>
 
                       <Text style={styles.wasteBillMeta}>
-                        {bill.account_no ||
-                          'No account number'}
+                        House No. {bill.house_number || member?.house_number || bill.account_no || '-'}
                       </Text>
                     </View>
 

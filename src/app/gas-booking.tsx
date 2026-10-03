@@ -45,6 +45,12 @@ export default function GasBookingScreen() {
     setCheckingBooking(true);
 
     try {
+      const { data: visibility } = await supabase.from('app_feature_visibility').select('is_visible').eq('feature_key', 'gas_booking').maybeSingle();
+      if (!visibility?.is_visible) {
+        router.replace('/');
+        setCheckingBooking(false);
+        return;
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser();

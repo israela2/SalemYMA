@@ -6,11 +6,18 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 
 export default function HomeScreen() {
+  const [showGasBooking, setShowGasBooking] = useState(false);
+  useEffect(() => {
+    supabase.from('app_feature_visibility').select('is_visible').eq('feature_key', 'gas_booking').maybeSingle()
+      .then(({ data }) => setShowGasBooking(!!data?.is_visible));
+  }, []);
   return (
     <ScrollView
       style={styles.container}
@@ -172,7 +179,7 @@ export default function HomeScreen() {
 </Pressable>
 
         {/* Gas Booking Featured Card */}
-        <Pressable
+        {showGasBooking && <Pressable
           style={styles.gasCard}
           onPress={() => router.push('/gas-booking')}
         >
@@ -214,7 +221,7 @@ export default function HomeScreen() {
               </Text>
             </View>
           </LinearGradient>
-        </Pressable>
+        </Pressable>}
 
         {/* Quick Access */}
         <View style={styles.sectionHeader}>

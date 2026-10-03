@@ -117,6 +117,12 @@ export default function CemeteryScreen() {
 
   const loadRecords = useCallback(async () => {
     try {
+      const { data: visibility } = await supabase.from('app_feature_visibility').select('is_visible').eq('feature_key', 'cemetery').maybeSingle();
+      if (!visibility?.is_visible) {
+        setRecords([]);
+        router.replace('/');
+        return;
+      }
       const { data, error } = await supabase
         .from('cemetery_records')
         .select('*')
@@ -1059,6 +1065,30 @@ const styles = StyleSheet.create({
     color: RED,
     fontSize: 14,
     fontWeight: '900',
+  },
+
+  notesBox: {
+    backgroundColor: '#F7F7F7',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    marginBottom: 14,
+  },
+
+  notesTitle: {
+    color: RED,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.1,
+    marginBottom: 7,
+  },
+
+  notesText: {
+    color: '#444444',
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '500',
   },
 
   biographyBox: {

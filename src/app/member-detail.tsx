@@ -19,10 +19,12 @@ type Member = {
   id: number;
   full_name: string | null;
   phone: string | null;
+  gender: string | null;
   email: string | null;
   section: string | null;
   branch_name: string | null;
   status: string | null;
+  house_number: string | null;
 };
 
 const sections = [
@@ -45,9 +47,11 @@ export default function MemberDetailScreen() {
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [gender, setGender] = useState('');
   const [email, setEmail] = useState('');
   const [section, setSection] = useState('');
   const [branch, setBranch] = useState('');
+  const [houseNumber, setHouseNumber] = useState('');
   const [status, setStatus] = useState('Active');
 
   const [message, setMessage] = useState('');
@@ -70,7 +74,7 @@ export default function MemberDetailScreen() {
     const { data, error } = await supabase
       .from('members')
       .select(
-        'id, full_name, phone, email, section, branch_name, status'
+        'id, full_name, phone, email, gender, section, branch_name, house_number, status'
       )
       .eq('id', memberId)
       .maybeSingle();
@@ -90,9 +94,11 @@ export default function MemberDetailScreen() {
     setMember(data);
     setFullName(data.full_name ?? '');
     setPhone(data.phone ?? '');
+    setGender(data.gender ?? '');
     setEmail(data.email ?? '');
     setSection(data.section ?? '');
     setBranch(data.branch_name ?? '');
+    setHouseNumber(data.house_number ?? '');
     setStatus(data.status ?? 'Active');
 
     setLoading(false);
@@ -117,6 +123,11 @@ export default function MemberDetailScreen() {
       return;
     }
 
+    if (!gender) {
+      setMessage('Mipa/Hmeichhia thlang rawh.');
+      return;
+    }
+
     if (!email.trim()) {
       setMessage('Email dah rawh.');
       return;
@@ -132,6 +143,11 @@ export default function MemberDetailScreen() {
       return;
     }
 
+    if (!houseNumber.trim()) {
+      setMessage('House Number dah rawh.');
+      return;
+    }
+
     setSaving(true);
 
     const { data, error } = await supabase
@@ -139,14 +155,16 @@ export default function MemberDetailScreen() {
       .update({
         full_name: fullName.trim(),
         phone: phone.trim(),
+        gender,
         email: email.trim().toLowerCase(),
         section,
         branch_name: branch.trim(),
+        house_number: houseNumber.trim(),
         status,
       })
       .eq('id', memberId)
       .select(
-        'id, full_name, phone, email, section, branch_name, status'
+        'id, full_name, phone, email, gender, section, branch_name, house_number, status'
       )
       .maybeSingle();
 
@@ -160,9 +178,11 @@ export default function MemberDetailScreen() {
       setMember(data);
       setFullName(data.full_name ?? '');
       setPhone(data.phone ?? '');
+      setGender(data.gender ?? '');
       setEmail(data.email ?? '');
       setSection(data.section ?? '');
       setBranch(data.branch_name ?? '');
+      setHouseNumber(data.house_number ?? '');
       setStatus(data.status ?? 'Active');
     }
 
@@ -262,7 +282,7 @@ export default function MemberDetailScreen() {
         </Text>
 
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => router.replace('/admin')}
           style={styles.backButton}
         >
           <Text style={styles.backButtonText}>
@@ -294,7 +314,7 @@ export default function MemberDetailScreen() {
           style={styles.header}
         >
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => router.replace('/admin')}
             style={styles.backCircle}
           >
             <Text style={styles.backIcon}>
@@ -381,6 +401,19 @@ export default function MemberDetailScreen() {
 
             <View style={styles.profileMetaItem}>
               <Text style={styles.profileMetaLabel}>
+                HOUSE NUMBER
+              </Text>
+
+              <Text
+                style={styles.profileMetaValue}
+                numberOfLines={1}
+              >
+                {houseNumber || 'Not assigned'}
+              </Text>
+            </View>
+
+            <View style={styles.profileMetaItem}>
+              <Text style={styles.profileMetaLabel}>
                 BRANCH
               </Text>
 
@@ -437,6 +470,48 @@ export default function MemberDetailScreen() {
             keyboardType="email-address"
             autoCapitalize="none"
           />
+
+          {/* GENDER */}
+          <Text style={styles.fieldLabel}>
+            MIPA / HMEICHHIA
+          </Text>
+
+          <View style={styles.sectionOptionList}>
+            {['Mipa', 'Hmeichhia'].map((item) => {
+              const selected = gender === item;
+
+              return (
+                <Pressable
+                  key={item}
+                  onPress={() => setGender(item)}
+                  style={[
+                    styles.sectionOption,
+                    selected && styles.sectionOptionActive,
+                    item === 'Hmeichhia' && styles.lastOption,
+                  ]}
+                >
+
+                  <Text
+                    style={[
+                      styles.sectionOptionText,
+                      selected && styles.sectionOptionTextActive,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+
+                  <View
+                    style={[
+                      styles.checkCircle,
+                      selected && styles.checkCircleActive,
+                    ]}
+                  >
+                    {selected && <Text style={styles.checkText}>✓</Text>}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
 
           {/* SECTION */}
           <Text style={styles.fieldLabel}>
@@ -504,6 +579,14 @@ export default function MemberDetailScreen() {
               );
             })}
           </View>
+
+          <FormField
+            label="HOUSE NUMBER"
+            value={houseNumber}
+            onChangeText={setHouseNumber}
+            placeholder="House Number (e.g. 12)"
+            keyboardType="default"
+          />
 
           <FormField
             label="BRANCH"
@@ -711,7 +794,7 @@ export default function MemberDetailScreen() {
 
         {/* BACK */}
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => router.replace('/admin')}
           style={styles.bottomButton}
         >
           <Text style={styles.bottomArrow}>

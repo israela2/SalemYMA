@@ -28,9 +28,11 @@ const statuses = [
 export default function AddMemberScreen() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [gender, setGender] = useState('');
   const [email, setEmail] = useState('');
   const [section, setSection] = useState('');
   const [branch, setBranch] = useState('Salem YMA Branch');
+  const [houseNumber, setHouseNumber] = useState('');
   const [status, setStatus] = useState('Active');
 
   const [loading, setLoading] = useState(false);
@@ -43,6 +45,7 @@ export default function AddMemberScreen() {
     const cleanPhone = phone.trim();
     const cleanEmail = email.trim().toLowerCase();
     const cleanBranch = branch.trim();
+    const cleanHouseNumber = houseNumber.trim();
 
     if (!cleanName) {
       setMessage('Member name dah hmasa rawh.');
@@ -54,8 +57,18 @@ export default function AddMemberScreen() {
       return;
     }
 
+    if (!gender) {
+      setMessage('Mipa/Hmeichhia thlang rawh.');
+      return;
+    }
+
     if (!section) {
       setMessage('Section thlang rawh.');
+      return;
+    }
+
+    if (!cleanHouseNumber) {
+      setMessage('House Number dah rawh.');
       return;
     }
 
@@ -66,8 +79,10 @@ export default function AddMemberScreen() {
       .insert({
         full_name: cleanName,
         phone: cleanPhone,
+        gender,
         email: cleanEmail || null,
         section,
+        house_number: cleanHouseNumber,
         branch_name: cleanBranch || 'Salem YMA Branch',
         status,
       });
@@ -101,7 +116,7 @@ export default function AddMemberScreen() {
           style={styles.header}
         >
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => router.replace('/admin')}
             style={styles.backCircle}
           >
             <Text style={styles.backIcon}>
@@ -158,6 +173,36 @@ export default function AddMemberScreen() {
           />
 
           <Text style={styles.label}>
+            MIPA / HMEICHHIA *
+          </Text>
+
+          <View style={styles.optionRow}>
+            {['Mipa', 'Hmeichhia'].map((item) => {
+              const selected = gender === item;
+
+              return (
+                <Pressable
+                  key={item}
+                  onPress={() => setGender(item)}
+                  style={[
+                    styles.optionButton,
+                    selected && styles.optionButtonSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      selected && styles.optionTextSelected,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.label}>
             EMAIL
           </Text>
 
@@ -203,6 +248,19 @@ export default function AddMemberScreen() {
               );
             })}
           </View>
+
+          <Text style={styles.label}>
+            HOUSE NUMBER *
+          </Text>
+
+          <TextInput
+            value={houseNumber}
+            onChangeText={setHouseNumber}
+            placeholder="House No. 12"
+            placeholderTextColor="#999999"
+            style={styles.input}
+            autoCapitalize="words"
+          />
 
           <Text style={styles.label}>
             BRANCH
@@ -303,7 +361,7 @@ export default function AddMemberScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => router.replace('/admin')}
             disabled={loading}
             style={styles.cancelButton}
           >

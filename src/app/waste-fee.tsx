@@ -42,6 +42,7 @@ type Member = {
   full_name: string | null;
   email: string | null;
   phone: string | null;
+  house_number: string | null;
 };
 
 export default function WasteFeeScreen() {
@@ -98,7 +99,7 @@ export default function WasteFeeScreen() {
       // Load member profile
       const { data: memberData, error: memberError } = await supabase
         .from('members')
-        .select('full_name, email, phone')
+        .select('full_name, email, phone, house_number')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -108,14 +109,19 @@ export default function WasteFeeScreen() {
 
       setMember(memberData ?? null);
 
-      // Load waste bills belonging to the current member
-      const { data: billData, error: billError } = await supabase
+      // Waste Fee is household-based: all members with the same House Number
+      // see the same ₹200/family bill.
+      const houseNumber = memberData?.house_number?.trim() || '';
+      let billQuery = supabase
         .from('waste_bills')
         .select(
           'id, account_no, bill_month, amount, due_date, status, paid_at, receipt_no, payment_method, payment_utr, payment_submitted_at, created_at'
         )
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+
+      const { data: billData, error: billError } = houseNumber
+        ? await billQuery.eq('house_number', houseNumber)
+        : await billQuery.eq('user_id', user.id);
 
       if (billError) {
         console.log('Waste bill error:', billError);
@@ -322,9 +328,9 @@ export default function WasteFeeScreen() {
         {/* Account */}
         <View style={styles.accountCard}>
           <View style={styles.accountLeft}>
-            <Text style={styles.sectionLabel}>ACCOUNT</Text>
+            <Text style={styles.sectionLabel}>HOUSE NUMBER</Text>
 
-            <Text style={styles.accountNumber}>{accountNo}</Text>
+            <Text style={styles.accountNumber}>{member?.house_number || accountNo}</Text>
 
             <Text style={styles.memberName}>
               {member?.full_name || 'Salem YMA Member'}

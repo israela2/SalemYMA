@@ -26,9 +26,12 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [gender, setGender] = useState('');
   const [section, setSection] = useState('');
+  const [houseNumber, setHouseNumber] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -54,8 +57,18 @@ export default function LoginScreen() {
       return;
     }
 
+    if (isRegister && !gender) {
+      setMessage('Mipa/Hmeichhia thlang rawh.');
+      return;
+    }
+
     if (isRegister && !section) {
       setMessage('Section thlang rawh.');
+      return;
+    }
+
+    if (isRegister && !houseNumber.trim()) {
+      setMessage('House Number dah rawh.');
       return;
     }
 
@@ -66,6 +79,7 @@ export default function LoginScreen() {
       const cleanEmail = email.trim().toLowerCase();
       const cleanName = fullName.trim();
       const cleanPhone = phone.trim();
+      const cleanHouseNumber = houseNumber.trim();
 
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
@@ -74,7 +88,9 @@ export default function LoginScreen() {
           data: {
             full_name: cleanName,
             phone: cleanPhone,
+            gender,
             section,
+            house_number: cleanHouseNumber,
           },
         },
       });
@@ -101,8 +117,10 @@ export default function LoginScreen() {
           user_id: userId,
           full_name: cleanName,
           phone: cleanPhone,
+          gender,
           email: cleanEmail,
           section: section,
+          house_number: cleanHouseNumber,
           branch_name: 'Salem YMA Branch',
           status: 'Active',
         });
@@ -256,6 +274,52 @@ export default function LoginScreen() {
                 />
               </View>
 
+              {/* GENDER */}
+
+              <View style={styles.field}>
+                <Text style={styles.label}>
+                  MIPA / HMEICHHIA
+                </Text>
+
+                <View style={styles.sectionOptions}>
+                  {['Mipa', 'Hmeichhia'].map((item) => {
+                    const selected = gender === item;
+
+                    return (
+                      <Pressable
+                        key={item}
+                        onPress={() => {
+                          setGender(item);
+                          setMessage('');
+                        }}
+                        style={[
+                          styles.sectionOption,
+                          selected && styles.sectionOptionSelected,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.radio,
+                            selected && styles.radioSelected,
+                          ]}
+                        >
+                          {selected && <View style={styles.radioInner} />}
+                        </View>
+
+                        <Text
+                          style={[
+                            styles.sectionOptionText,
+                            selected && styles.sectionOptionTextSelected,
+                          ]}
+                        >
+                          {item}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
               {/* SECTION */}
 
               <View style={styles.field}>
@@ -311,6 +375,20 @@ export default function LoginScreen() {
             </>
           )}
 
+          {isRegister && (
+            <View style={styles.field}>
+              <Text style={styles.label}>HOUSE NUMBER</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="House No. 12"
+                placeholderTextColor="#999999"
+                value={houseNumber}
+                onChangeText={setHouseNumber}
+                autoCapitalize="words"
+              />
+            </View>
+          )}
+
           {/* =========================
               EMAIL
           ========================= */}
@@ -341,14 +419,29 @@ export default function LoginScreen() {
               PASSWORD
             </Text>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your password"
-              placeholderTextColor="#999999"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
+            <View style={styles.passwordWrap}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                placeholder="Enter your password"
+                placeholderTextColor="#999999"
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <Pressable
+                onPress={() => setShowPassword((value) => !value)}
+                style={styles.passwordToggle}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              >
+                <Text style={styles.passwordToggleText}>
+                  {showPassword ? 'HIDE' : 'SHOW'}
+                </Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* =========================
@@ -862,5 +955,25 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: '#AAAAAA',
     marginTop: 8,
+  },
+
+  passwordWrap: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: 72,
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+  },
+  passwordToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    color: '#D32F2F',
   },
 });

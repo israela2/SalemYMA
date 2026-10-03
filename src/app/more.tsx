@@ -18,9 +18,12 @@ export default function MoreScreen() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [showCemetery, setShowCemetery] = useState(false);
 
   useEffect(() => {
     checkLogin();
+    supabase.from('app_feature_visibility').select('is_visible').eq('feature_key', 'cemetery').maybeSingle()
+      .then(({ data }) => setShowCemetery(!!data?.is_visible));
 
     const {
       data: { subscription },
@@ -240,7 +243,7 @@ export default function MoreScreen() {
       </Pressable>
 
       {/* Cemetery / Thlanmual */}
-      <Pressable
+      {showCemetery && <Pressable
         style={({ pressed }) => [
           styles.menuCard,
           styles.cemeteryCard,
@@ -280,7 +283,7 @@ export default function MoreScreen() {
         <Text style={styles.arrow}>
           ›
         </Text>
-      </Pressable>
+      </Pressable>}
 
       {/* Notifications */}
       <Pressable

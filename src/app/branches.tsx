@@ -96,6 +96,7 @@ function normalizeSectionLeader(leader: SectionLeader): SectionLeader {
 export default function BranchesScreen() {
   const [leaders, setLeaders] = useState<BranchLeader[]>([]);
   const [sectionLeaders, setSectionLeaders] = useState<SectionLeader[]>([]);
+  const [memberStats, setMemberStats] = useState({ total: 0, mipa: 0, hmeichhia: 0 });
   const [selectedSection, setSelectedSection] = useState('Section I');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -108,7 +109,7 @@ export default function BranchesScreen() {
     try {
       setLoading(true);
 
-      const [branchResult, sectionResult] = await Promise.all([
+      const [branchResult, sectionResult, memberResult] = await Promise.all([
         supabase
           .from('branch_leaders')
           .select(
@@ -125,6 +126,10 @@ export default function BranchesScreen() {
           .eq('is_active', true)
           .order('section', { ascending: true })
           .order('display_order', { ascending: true }),
+              supabase
+          .from('members')
+          .select('gender, status, branch_name')
+          .eq('branch_name', 'Salem YMA Branch'),
       ]);
 
       if (branchResult.error) {
@@ -137,6 +142,20 @@ export default function BranchesScreen() {
         setLeaders(
           ((branchResult.data ?? []) as BranchLeader[]).map(normalizeBranchLeader)
         );
+      }
+
+      if (memberResult.error) {
+        console.log('Member statistics error:', memberResult.error);
+        setMemberStats({ total: 0, mipa: 0, hmeichhia: 0 });
+      } else {
+        const activeMembers = (memberResult.data ?? []).filter(
+          (member: any) => (member.status ?? 'Active') === 'Active'
+        );
+        setMemberStats({
+          total: activeMembers.length,
+          mipa: activeMembers.filter((member: any) => member.gender === 'Mipa').length,
+          hmeichhia: activeMembers.filter((member: any) => member.gender === 'Hmeichhia').length,
+        });
       }
 
       if (sectionResult.error) {
@@ -463,6 +482,24 @@ export default function BranchesScreen() {
             <Text style={styles.activeText}>
               ● ACTIVE BRANCH
             </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Branch Members */}
+      <View style={styles.memberStatsCard}>
+        <Text style={styles.memberStatsEyebrow}>YMA SALEM BRANCH MEMBER</Text>
+        <Text style={styles.memberStatsTitle}>TOTAL MEMBERS</Text>
+        <Text style={styles.memberTotal}>{memberStats.total}</Text>
+
+        <View style={styles.memberGenderRow}>
+          <View style={styles.memberGenderCard}>
+            <Text style={styles.memberGenderNumber}>{memberStats.mipa}</Text>
+            <Text style={styles.memberGenderLabel}>MIPA</Text>
+          </View>
+          <View style={styles.memberGenderCard}>
+            <Text style={styles.memberGenderNumber}>{memberStats.hmeichhia}</Text>
+            <Text style={styles.memberGenderLabel}>HMEICHHIA</Text>
           </View>
         </View>
       </View>
@@ -924,6 +961,63 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
+    letterSpacing: 1,
+  },
+
+  memberStatsCard: {
+    marginHorizontal: 18,
+    marginBottom: 22,
+    padding: 20,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    elevation: 3,
+    shadowColor: '#000000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  memberStatsEyebrow: {
+    color: '#C62828',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+  },
+  memberStatsTitle: {
+    color: '#151515',
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: 5,
+  },
+  memberTotal: {
+    color: '#C62828',
+    fontSize: 42,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  memberGenderRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  memberGenderCard: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: '#F8F8F8',
+    alignItems: 'center',
+  },
+  memberGenderNumber: {
+    color: '#151515',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  memberGenderLabel: {
+    color: '#777777',
+    fontSize: 10,
+    fontWeight: '900',
+    marginTop: 2,
     letterSpacing: 1,
   },
 

@@ -4,7 +4,10 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  Linking,
+  Platform,
   Modal,
   Pressable,
   RefreshControl,
@@ -24,19 +27,17 @@ type GalleryItem = {
   file_url: string;
   thumbnail_url: string | null;
   created_at: string;
+  source: 'legacy' | 'managed';
 };
 
-const albums = [
-  'All',
-  'Activities',
-  'Events',
-  'Members',
-  'Videos',
-];
 
 export default function GalleryScreen() {
   const [items, setItems] = useState<GalleryItem[]>([]);
-  const [selectedAlbum, setSelectedAlbum] = useState('All');
+  const [selectedAlbum, setSelectedAlbum] = useState('');
+  const [selectedAlbumKind, setSelectedAlbumKind] = useState<'legacy' | 'managed' | ''>('');
+  const [availableAlbums, setAvailableAlbums] = useState<string[]>(['All']);
+  const [managedAlbumNames, setManagedAlbumNames] = useState<string[]>([]);
+  const [collectionNames, setCollectionNames] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -74,6 +75,11 @@ export default function GalleryScreen() {
         )
         .order('created_at', { ascending: false });
 
+      const { data: albumRows } = await supabase
+        .from('gallery_albums')
+        .select('title, description')
+        .order('created_at', { ascending: false });
+
       if (oldResult.error && newResult.error) {
         setErrorMessage(
           oldResult.error.message || newResult.error.message
@@ -95,6 +101,7 @@ export default function GalleryScreen() {
         file_url: item.file_url || '',
         thumbnail_url: item.thumbnail_url || null,
         created_at: item.created_at,
+        source: 'legacy',
       }));
 
       const newItems: GalleryItem[] = (
@@ -113,6 +120,7 @@ export default function GalleryScreen() {
         file_url: item.image_url || '',
         thumbnail_url: null,
         created_at: item.created_at,
+        source: 'managed',
       }));
 
       /*
@@ -130,6 +138,33 @@ export default function GalleryScreen() {
       });
 
       setItems(combined);
+      const albumNames = (albumRows || [])
+        .map((album: any) => album.title)
+        .filter(Boolean) as string[];
+
+      // Keep older gallery categories accessible as album cards, but do not
+      // render them as a separate photo collection below the albums.
+      const categoryNames = combined.map((item) => item.album).filter(Boolean);
+      const legacyNames = Array.from(new Set(categoryNames))
+        .filter((name) => !albumNames.includes(name));
+
+      setManagedAlbumNames(albumNames);
+      setCollectionNames(legacyNames);
+
+      const dynamicAlbums = Array.from(
+        new Set([...albumNames, ...legacyNames]),
+      );
+
+      setAvailableAlbums(['All', ...dynamicAlbums]);
+
+      if (
+        selectedAlbum &&
+        selectedAlbum !== 'All' &&
+        !dynamicAlbums.includes(selectedAlbum)
+      ) {
+        setSelectedAlbum('');
+        setSelectedAlbumKind('');
+      }
     } catch (error: any) {
       setErrorMessage(
         error?.message || 'Unable to load gallery.'
@@ -143,6 +178,26 @@ export default function GalleryScreen() {
 
   useEffect(() => {
     loadGallery();
+
+    // Live update: members see newly uploaded/deleted photos and albums
+    // without having to leave and reopen the Gallery page.
+    const channel = supabase
+      .channel('public-gallery-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'gallery' },
+        () => { loadGallery(); },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'gallery_albums' },
+        () => { loadGallery(); },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [loadGallery]);
 
   const onRefresh = async () => {
@@ -150,12 +205,84 @@ export default function GalleryScreen() {
     await loadGallery();
   };
 
+  const downloadPhoto = async () => {
+    if (!selectedPhoto?.file_url) return;
+
+    const safeName = (selectedPhoto.title || 'salem-yma-photo')
+      .replace(/[^a-z0-9-_ ]/gi, '')
+      .trim()
+      .replace(/\s+/g, '-') || 'salem-yma-photo';
+
+    if (Platform.OS === 'web') {
+      try {
+        // Fetching as a Blob makes the browser download the original image
+        // instead of navigating away from the gallery viewer.
+        const response = await fetch(selectedPhoto.file_url);
+        if (!response.ok) throw new Error('Download failed');
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = `${safeName}.jpg`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(objectUrl);
+      } catch {
+        // Fallback: open the original image so the user can save it from the browser.
+        await Linking.openURL(selectedPhoto.file_url);
+      }
+      return;
+    }
+
+    // On mobile, open the original image; users can save it from the image
+    // viewer/browser using their device's Save/Download option.
+    try {
+      await Linking.openURL(selectedPhoto.file_url);
+    } catch {
+      Alert.alert('Unable to open photo', 'Please try again later.');
+    }
+  };
+
   const filteredItems =
     selectedAlbum === 'All'
       ? items
-      : items.filter(
-          (item) => item.album === selectedAlbum
-        );
+      : selectedAlbum
+        ? items.filter((item) => item.album === selectedAlbum)
+        : [];
+
+  const visibleAlbumNames = [...managedAlbumNames, ...collectionNames];
+  const renderAlbumCard = (album: string, isManaged: boolean) => {
+    const albumItems = items.filter((item) => item.album === album);
+    const cover = albumItems.find((item) => !!(item.thumbnail_url || item.file_url));
+    const count = albumItems.filter((item) => item.media_type === 'photo').length;
+    return (
+      <Pressable
+        key={`${isManaged ? 'album' : 'collection'}-${album}`}
+        onPress={() => { setSelectedAlbum(album); setSelectedAlbumKind(isManaged ? 'managed' : 'legacy'); }}
+        style={({ pressed }) => [styles.albumCard, pressed && styles.albumCardPressed]}
+      >
+        <View style={styles.albumCoverWrap}>
+          {cover ? (
+            <Image source={{ uri: cover.thumbnail_url || cover.file_url }} style={styles.albumCover} resizeMode="cover" />
+          ) : (
+            <View style={[styles.albumCover, styles.albumCoverEmpty]}>
+              <Text style={styles.albumCoverIcon}>▧</Text>
+            </View>
+          )}
+          <View style={styles.albumCoverShade} />
+          <View style={styles.albumPhotoCountPill}>
+            <Text style={styles.albumPhotoCountText}>{count} {count === 1 ? 'photo' : 'photos'}</Text>
+          </View>
+          <View style={styles.albumStackIcon}><Text style={styles.albumStackIconText}>▤</Text></View>
+        </View>
+        <View style={styles.albumCardDetails}>
+          <Text style={styles.albumCardTitle} numberOfLines={2}>{album}</Text>
+          <Text style={styles.albumCardMeta}>{isManaged ? 'PHOTO ALBUM' : 'COLLECTION'}</Text>
+        </View>
+      </Pressable>
+    );
+  };
 
   const photoItems = filteredItems.filter(
     (item) =>
@@ -174,11 +301,16 @@ export default function GalleryScreen() {
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
+        bounces
+        alwaysBounceVertical
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor="#C62828"
+            colors={["#C62828"]}
+            progressBackgroundColor="#FFFFFF"
+            progressViewOffset={Platform.OS === 'android' ? 8 : 0}
           />
         }
       >
@@ -224,43 +356,14 @@ export default function GalleryScreen() {
           </View>
         </View>
 
-        {/* ALBUM FILTERS */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.albumScroll}
-        >
-          {albums.map((album) => {
-            const active = selectedAlbum === album;
-
-            return (
-              <Pressable
-                key={album}
-                onPress={() => setSelectedAlbum(album)}
-                style={[
-                  styles.albumButton,
-                  active
-                    ? styles.albumButtonActive
-                    : null,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.albumText,
-                    active
-                      ? styles.albumTextActive
-                      : null,
-                  ]}
-                >
-                  {album}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        {selectedAlbum && selectedAlbum !== 'All' ? (
+          <Pressable onPress={() => { setSelectedAlbum(''); setSelectedAlbumKind(''); }} style={styles.backToAlbumsButton}>
+            <Text style={styles.backToAlbumsText}>‹ Back to albums</Text>
+          </Pressable>
+        ) : null}
 
         {/* COUNT */}
-        {!loading && !errorMessage ? (
+        {!loading && !errorMessage && selectedAlbum ? (
           <View style={styles.countRow}>
             <Text style={styles.countText}>
               {filteredItems.length} media item
@@ -309,6 +412,42 @@ export default function GalleryScreen() {
                 TRY AGAIN
               </Text>
             </Pressable>
+          </View>
+        ) : !selectedAlbum ? (
+          <View style={styles.albumListing}>
+            <View style={styles.albumSectionHeading}>
+              <View style={styles.albumSectionHeadingCopy}>
+                <Text style={styles.albumSectionTitle}>Albums</Text>
+                <Text style={styles.albumSectionSubtitle}>
+                  Choose an album to view its photos
+                </Text>
+              </View>
+              <Text style={styles.albumSectionCount}>
+                {visibleAlbumNames.length}
+              </Text>
+            </View>
+
+            {visibleAlbumNames.length > 0 ? (
+              <View style={styles.albumCardsGrid}>
+                {managedAlbumNames.map((album) =>
+                  renderAlbumCard(album, true)
+                )}
+
+                {collectionNames.map((album) =>
+                  renderAlbumCard(album, false)
+                )}
+              </View>
+            ) : (
+              <View style={styles.stateCard}>
+                <View style={styles.emptyIconBox}>
+                  <Text style={styles.emptyIcon}>🖼️</Text>
+                </View>
+                <Text style={styles.stateTitle}>No albums yet</Text>
+                <Text style={styles.stateText}>
+                  New albums and photos will appear here when the admin adds them.
+                </Text>
+              </View>
+            )}
           </View>
         ) : filteredItems.length === 0 ? (
           <View style={styles.stateCard}>
@@ -547,6 +686,15 @@ export default function GalleryScreen() {
                 {selectedPhoto?.album}
               </Text>
             </View>
+
+            <Pressable
+              onPress={downloadPhoto}
+              style={styles.photoDownloadButton}
+              accessibilityRole="button"
+              accessibilityLabel="Download photo"
+            >
+              <Text style={styles.photoDownloadText}>↓ Download</Text>
+            </Pressable>
           </View>
 
           {selectedPhoto ? (
@@ -1126,6 +1274,22 @@ const styles = StyleSheet.create({
     marginTop: -3,
   },
 
+  photoDownloadButton: {
+    minHeight: 38,
+    paddingHorizontal: 11,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+
+  photoDownloadText: {
+    color: '#111111',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
   photoModalTitleBox: {
     flex: 1,
     marginLeft: 12,
@@ -1214,4 +1378,30 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 320,
   },
+
+  albumListing: { paddingBottom: 8 },
+  albumSectionHeading: { marginHorizontal: 18, marginTop: 8, marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  albumSectionHeadingSpaced: { marginTop: 14, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#EEEEEE' },
+  albumSectionHeadingCopy: { flex: 1 },
+  albumSectionTitle: { color: '#171717', fontSize: 20, fontWeight: '900', letterSpacing: -0.3 },
+  albumSectionSubtitle: { color: '#777777', fontSize: 12, marginTop: 4 },
+  albumSectionCount: { minWidth: 30, textAlign: 'center', overflow: 'hidden', color: '#8E1B1B', backgroundColor: '#F8EAEA', fontSize: 12, fontWeight: '800', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 14 },
+  albumCardsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', paddingHorizontal: 18, paddingBottom: 16, gap: 12 },
+  albumCard: { width: '48%', backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', marginBottom: 4, borderWidth: 1, borderColor: '#EAEAEA', shadowColor: '#000000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  albumCardPressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
+  albumCoverWrap: { width: '100%', height: 142, backgroundColor: '#F1EEEE', position: 'relative' },
+  albumCover: { width: '100%', height: '100%', backgroundColor: '#F0F0F0' },
+  albumCoverEmpty: { alignItems: 'center', justifyContent: 'center' },
+  albumCoverIcon: { fontSize: 38, color: '#A5A5A5' },
+  albumCoverShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.08)' },
+  albumPhotoCountPill: { position: 'absolute', right: 8, bottom: 8, backgroundColor: 'rgba(15,15,15,0.76)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12 },
+  albumPhotoCountText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  albumStackIcon: { position: 'absolute', left: 9, top: 9, width: 27, height: 27, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.92)' },
+  albumStackIconText: { color: '#8E1B1B', fontSize: 16, fontWeight: '900' },
+  albumCardDetails: { paddingHorizontal: 11, paddingTop: 10, paddingBottom: 12, minHeight: 66 },
+  albumCardTitle: { color: '#202020', fontSize: 14, lineHeight: 19, fontWeight: '800' },
+  albumCardMeta: { color: '#969696', fontSize: 9, letterSpacing: 1, fontWeight: '800', marginTop: 5 },
+  backToAlbumsButton: { marginHorizontal: 18, marginBottom: 12, alignSelf: 'flex-start', backgroundColor: '#F4EAEA', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18 },
+  backToAlbumsText: { color: '#8E1B1B', fontWeight: '800' },
+
 });

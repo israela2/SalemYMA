@@ -22,6 +22,7 @@ type Member = {
   email: string | null;
   section: string | null;
   branch_name: string | null;
+  house_number: string | null;
   status: string | null;
   profile_photo: string | null;
   avatar_url?: string | null;
@@ -52,7 +53,7 @@ export default function ProfileScreen() {
       const { data, error } = await supabase
         .from('members')
         .select(
-          'full_name, phone, email, section, branch_name, status, profile_photo',
+          'full_name, phone, email, section, branch_name, house_number, status, profile_photo',
         )
         .eq('user_id', user.id)
         .maybeSingle();
@@ -81,7 +82,8 @@ export default function ProfileScreen() {
           phone: user.user_metadata?.phone || null,
           email: user.email || null,
           section: user.user_metadata?.section || null,
-          branch_name: null,
+          branch_name: 'YMA Salem Branch',
+          house_number: user.user_metadata?.house_number || null,
           status: null,
           profile_photo: metadataPhoto,
         });
@@ -281,9 +283,14 @@ export default function ProfileScreen() {
             section:
               user.user_metadata
                 ?.section || null,
-            branch_name: null,
+            branch_name: 'YMA Salem Branch',
+            house_number:
+              user.user_metadata
+                ?.house_number || null,
             status: null,
             profile_photo:
+              photoUrl,
+            avatar_url:
               photoUrl,
           };
         }
@@ -330,6 +337,10 @@ export default function ProfileScreen() {
   const branch =
     member?.branch_name ||
     'Salem YMA Branch';
+
+  const houseNumber =
+    member?.house_number ||
+    'Not assigned';
 
   const status =
     member?.status ||
@@ -591,6 +602,17 @@ export default function ProfileScreen() {
             ? 'Loading...'
             : branch
         }
+      />
+
+      <InfoCard
+        icon="⌂"
+        label="House Number"
+        value={
+          loading
+            ? 'Loading...'
+            : houseNumber
+        }
+        badge
       />
 
       {/* Membership Status */}

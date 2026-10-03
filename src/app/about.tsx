@@ -9,8 +9,37 @@ import {
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 
 export default function AboutScreen() {
+  const [memberStats, setMemberStats] = useState({ total: 0, mipa: 0, hmeichhia: 0 });
+  const [aboutText, setAboutText] = useState<string>('YMA Salem Branch hi Young Mizo Association hnuaia branch pakhat a ni a. Salem khawtlang chhungah mihring nunphung tha, inpumkhatna, mahni hriatna leh khawtlang tana rawngbawlna te a ngai pawimawh em em a ni.\n\nYMA Salem Branch chuan member-te leh khawtlang tan hmalakna hrang hrang, khawtlang nun siamthatna leh inpumkhatna tihchakna turin a theih ang tawkin hma a la thin.');
+
+  useEffect(() => {
+    loadAboutData();
+  }, []);
+
+  async function loadAboutData() {
+    const [aboutResult, memberResult] = await Promise.all([
+      supabase.from('branch_info').select('about_content').eq('id', 1).maybeSingle(),
+      supabase.from('members').select('gender, status, branch_name').eq('branch_name', 'Salem YMA Branch'),
+    ]);
+
+    if (aboutResult.data?.about_content) setAboutText(aboutResult.data.about_content);
+
+    if (!memberResult.error) {
+      const activeMembers = (memberResult.data ?? []).filter(
+        (member: any) => (member.status ?? 'Active') === 'Active'
+      );
+      setMemberStats({
+        total: activeMembers.length,
+        mipa: activeMembers.filter((member: any) => member.gender === 'Mipa').length,
+        hmeichhia: activeMembers.filter((member: any) => member.gender === 'Hmeichhia').length,
+      });
+    }
+  }
+
   return (
     <ScrollView
       style={styles.container}
@@ -88,75 +117,32 @@ export default function AboutScreen() {
         </View>
 
         <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            YMA Salem Branch hi Young Mizo Association
-            hnuaia branch pakhat a ni a. Salem khawtlang
-            chhungah mihring nunphung tha, inpumkhatna,
-            mahni hriatna leh khawtlang tana rawngbawlna
-            te a ngai pawimawh em em a ni.
-          </Text>
-
-          <Text style={styles.infoText}>
-            YMA Salem Branch chuan member-te leh
-            khawtlang tan hmalakna hrang hrang, khawtlang
-            nun siamthatna leh inpumkhatna tihchakna
-            turin a theih ang tawkin hma a la thin.
-          </Text>
+          {aboutText.split(/\n\s*\n/).filter(Boolean).map((paragraph, index) => (
+            <Text key={index} style={styles.infoText}>
+              {paragraph}
+            </Text>
+          ))}
         </View>
       </View>
 
-      {/* Our Purpose */}
-      <View style={styles.section}>
-        <View style={styles.sectionTitleRow}>
-          <View style={styles.sectionDot} />
-          <Text style={styles.sectionTitle}>
-            Kan Tum
-          </Text>
-        </View>
+      {/* Member Statistics */}
+      <View style={styles.statsSection}>
+        <Text style={styles.statsEyebrow}>OUR MEMBERS</Text>
+        <Text style={styles.statsTitle}>Member Statistics</Text>
+        <Text style={styles.statsSubtitle}>Salem YMA Branch member count</Text>
 
-        <View style={styles.infoCard}>
-          <View style={styles.pointRow}>
-            <View style={styles.pointIcon}>
-              <Text style={styles.pointIconText}>✓</Text>
-            </View>
-
-            <Text style={styles.pointText}>
-              Member-te inpumkhatna leh inhmangaihna
-              tihchak.
-            </Text>
+        <View style={styles.statsRow}>
+          <View style={[styles.statCard, styles.statCardWide]}>
+            <Text style={styles.statNumber}>{memberStats.total}</Text>
+            <Text style={styles.statLabel}>TOTAL MEMBERS</Text>
           </View>
-
-          <View style={styles.pointRow}>
-            <View style={styles.pointIcon}>
-              <Text style={styles.pointIconText}>✓</Text>
-            </View>
-
-            <Text style={styles.pointText}>
-              Salem khawtlang tana hmalakna leh
-              rawngbawlna pe.
-            </Text>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{memberStats.mipa}</Text>
+            <Text style={styles.statLabel}>MIPA</Text>
           </View>
-
-          <View style={styles.pointRow}>
-            <View style={styles.pointIcon}>
-              <Text style={styles.pointIconText}>✓</Text>
-            </View>
-
-            <Text style={styles.pointText}>
-              Khawtlang nunphung tha leh tlawmngaihna
-              tihchak.
-            </Text>
-          </View>
-
-          <View style={styles.pointRow}>
-            <View style={styles.pointIcon}>
-              <Text style={styles.pointIconText}>✓</Text>
-            </View>
-
-            <Text style={styles.pointText}>
-              YMA hmalakna leh tumte chu member-te
-              leh khawtlang hnenah hriattir.
-            </Text>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{memberStats.hmeichhia}</Text>
+            <Text style={styles.statLabel}>HMEICHHIA</Text>
           </View>
         </View>
       </View>
@@ -488,6 +474,71 @@ const styles = StyleSheet.create({
     fontSize: 9,
     lineHeight: 14,
     marginTop: 3,
+  },
+
+  statsSection: {
+    marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 10,
+    padding: 20,
+    borderRadius: 24,
+    backgroundColor: '#111111',
+    overflow: 'hidden',
+  },
+
+  statsEyebrow: {
+    color: '#D32F2F',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.8,
+  },
+
+  statsTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+
+  statsSubtitle: {
+    color: '#AAAAAA',
+    fontSize: 11,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  statCard: {
+    flex: 1,
+    minHeight: 94,
+    borderRadius: 16,
+    backgroundColor: '#1C1C1C',
+    padding: 12,
+    justifyContent: 'center',
+  },
+
+  statCardWide: {
+    flex: 1.25,
+    borderWidth: 1,
+    borderColor: '#D32F2F55',
+  },
+
+  statNumber: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '900',
+  },
+
+  statLabel: {
+    color: '#BDBDBD',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    marginTop: 5,
   },
 
   footer: {
