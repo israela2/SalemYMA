@@ -10,11 +10,31 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { loadNotifications, registerForNotifications, type AppNotification } from '../lib/notification-service';
+import { Alert, Platform } from 'react-native';
+import { clearAllNotifications, hideNotification, loadNotifications, registerForNotifications, type AppNotification } from '../lib/notification-service';
 import { supabase } from '../lib/supabase';
 
 export default function NotificationsScreen() {
   const [items, setItems] = useState<AppNotification[]>([]);
+
+  const removeNotification = async (id: number) => {
+    await hideNotification(id);
+    setItems((current) => current.filter((item) => item.id !== id));
+  };
+
+  const clearRecentNotifications = async () => {
+    if (!items.length) return;
+    const message = 'Clear all recent notifications from your view?';
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm(message)
+      : await new Promise<boolean>((resolve) => Alert.alert('Clear notifications', message, [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Clear all', style: 'destructive', onPress: () => resolve(true) },
+        ]));
+    if (!confirmed) return;
+    await clearAllNotifications();
+    setItems([]);
+  };
 
   useEffect(() => {
     registerForNotifications().catch(() => {});
@@ -24,7 +44,6 @@ export default function NotificationsScreen() {
       .channel('notifications-live')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'is_published=eq.true' }, async (payload) => {
         const row = payload.new as AppNotification;
-        if (row.data?.type !== 'news') return;
         setItems((current) => [row, ...current.filter((item) => item.id !== row.id)].slice(0, 50));
 
       })
@@ -108,11 +127,9 @@ export default function NotificationsScreen() {
           </Text>
         </View>
 
-        <View style={styles.unreadPill}>
-          <Text style={styles.unreadPillText}>
-            2 NEW
-          </Text>
-        </View>
+        <Pressable style={styles.clearAllButton} onPress={clearRecentNotifications}>
+          <Text style={styles.clearAllButtonText}>CLEAR ALL</Text>
+        </Pressable>
       </View>
 
       {items.length > 0 ? items.map((item) => (
@@ -133,7 +150,12 @@ export default function NotificationsScreen() {
             <Text style={styles.notificationText}>{item.body}</Text>
             <View style={styles.metaRow}>
               <Text style={styles.time}>{new Date(item.created_at).toLocaleDateString('en-GB')}</Text>
-              <View style={styles.newLabel}><Text style={styles.newLabelText}>NEW</Text></View>
+              <View style={styles.metaActions}>
+                <View style={styles.newLabel}><Text style={styles.newLabelText}>NEW</Text></View>
+                <Pressable style={styles.clearButton} onPress={() => removeNotification(item.id)}>
+                  <Text style={styles.clearButtonText}>Clear</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </View>
@@ -368,12 +390,19 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  unreadPill: {
-    backgroundColor: '#FBEAEA',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
+  clearAllButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: '#8E1B1B',
   },
+  clearAllButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
 
   unreadPillText: {
     color: '#C62828',
@@ -445,6 +474,27 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 16,
     marginTop: 5,
+  },
+
+  metaActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  clearButton: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D32F2F',
+    backgroundColor: '#FFFFFF',
+  },
+
+  clearButtonText: {
+    color: '#8E1B1B',
+    fontSize: 11,
+    fontWeight: '700',
   },
 
   metaRow: {

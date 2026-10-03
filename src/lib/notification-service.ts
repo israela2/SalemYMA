@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 
 declare const require: any;
@@ -59,8 +59,7 @@ export async function registerForNotifications() {
     }
     if (finalStatus !== 'granted') return null;
 
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-    const pushToken = await NotificationsModule.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+    const pushToken = await NotificationsModule.getExpoPushTokenAsync();
     token = pushToken?.data ?? null;
     platform = Platform.OS;
   }
@@ -77,6 +76,32 @@ export async function registerForNotifications() {
   return { platform, token };
 }
 
+const HIDDEN_NOTIFICATIONS_KEY = 'salem_yma_hidden_notifications';
+
+async function getHiddenNotificationIds(): Promise<number[]> {
+  try {
+    const raw = await AsyncStorage.getItem(HIDDEN_NOTIFICATIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(Number).filter(Number.isFinite) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveHiddenNotificationIds(ids: number[]) {
+  await AsyncStorage.setItem(HIDDEN_NOTIFICATIONS_KEY, JSON.stringify(Array.from(new Set(ids))));
+}
+
+export async function hideNotification(id: number) {
+  const ids = await getHiddenNotificationIds();
+  if (!ids.includes(id)) await saveHiddenNotificationIds([...ids, id]);
+}
+
+export async function clearAllNotifications() {
+  const items = await loadNotifications(500);
+  await saveHiddenNotificationIds(items.map((item) => item.id));
+}
+
 export async function loadNotifications(limit = 50): Promise<AppNotification[]> {
   const { data, error } = await supabase
     .from('notifications')
@@ -85,7 +110,8 @@ export async function loadNotifications(limit = 50): Promise<AppNotification[]> 
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []) as AppNotification[];
+  const hiddenIds = new Set(await getHiddenNotificationIds());
+  return ((data ?? []) as AppNotification[]).filter((item) => !hiddenIds.has(item.id));
 }
 
 export async function publishNotification(title: string, body: string, data: Record<string, any> = {}) {
@@ -96,10 +122,10 @@ export async function publishNotification(title: string, body: string, data: Rec
     .single();
   if (error) throw error;
 
-  // Trigger native phone push delivery after the notification is stored.
-  // Web users use the in-app notification feed; browser push requires a separate
-  // service-worker/VAPID setup and should not call the native Expo push function.
-  if (Platform.OS !== 'web') try {
+  // Trigger phone push delivery after the notification is stored.
+  // Do not fail publishing the announcement if the Edge Function is not
+  // deployed/configured yet; the in-app notification remains available.
+  try {
     const { error: pushError } = await supabase.functions.invoke('send-notification', {
       body: {
         title: title.trim(),
