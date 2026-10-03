@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { supabase } from '../lib/supabase';
+import { registerForNotifications, setupNotificationHandler } from '../lib/notification-service';
 
 function TabIcon({
   icon,
@@ -123,6 +124,48 @@ export default function TabLayout() {
   /*
    * CHECK SUPABASE SESSION
    */
+  useEffect(() => {
+    setupNotificationHandler();
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    registerForNotifications().catch((error) => {
+      console.log('[Notifications] registration skipped:', error?.message || error);
+    });
+  }, [session]);
+
+  // Keep a global realtime listener so a newly published announcement can
+  // notify the user even when they are on another page of the app.
+  useEffect(() => {
+    if (!session) return;
+
+    const channel = supabase
+      .channel(`global-notifications-${session.user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'is_published=eq.true' },
+        (payload) => {
+          const row = payload.new as { title?: string; body?: string; data?: Record<string, any> };
+          if (row.data?.type !== 'news') return;
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification(row.title || 'New Salem YMA News', {
+                body: row.body || 'A new Salem YMA news or announcement is available.',
+                data: row.data || {},
+                icon: '/favicon.png',
+              });
+            } catch {}
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session]);
+
   useEffect(() => {
     let mounted = true;
 

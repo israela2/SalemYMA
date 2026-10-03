@@ -9,8 +9,31 @@ import {
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { loadNotifications, registerForNotifications, type AppNotification } from '../lib/notification-service';
+import { supabase } from '../lib/supabase';
 
 export default function NotificationsScreen() {
+  const [items, setItems] = useState<AppNotification[]>([]);
+
+  useEffect(() => {
+    registerForNotifications().catch(() => {});
+    loadNotifications().then(setItems).catch(() => {});
+
+    const channel = supabase
+      .channel('notifications-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'is_published=eq.true' }, async (payload) => {
+        const row = payload.new as AppNotification;
+        if (row.data?.type !== 'news') return;
+        setItems((current) => [row, ...current.filter((item) => item.id !== row.id)].slice(0, 50));
+
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
   return (
     <ScrollView
       style={styles.container}
@@ -92,87 +115,29 @@ export default function NotificationsScreen() {
         </View>
       </View>
 
-      {/* Notification 1 */}
-      <View style={styles.notificationCard}>
-        <LinearGradient
-          colors={['#D32F2F', '#8E1B1B']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.iconBox}
-        >
-          <Text style={styles.icon}>
-            📢
-          </Text>
-        </LinearGradient>
-
-        <View style={styles.notificationContent}>
-          <View style={styles.titleRow}>
-            <Text style={styles.notificationTitle}>
-              Salem YMA Announcement
-            </Text>
-
-            <View style={styles.newDot} />
-          </View>
-
-          <Text style={styles.notificationText}>
-            Important announcements and information
-            will appear here.
-          </Text>
-
-          <View style={styles.metaRow}>
-            <Text style={styles.time}>
-              Today
-            </Text>
-
-            <View style={styles.newLabel}>
-              <Text style={styles.newLabelText}>
-                NEW
-              </Text>
+      {items.length > 0 ? items.map((item) => (
+        <View key={item.id} style={styles.notificationCard}>
+          <LinearGradient
+            colors={['#D32F2F', '#8E1B1B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.iconBox}
+          >
+            <Text style={styles.icon}>📢</Text>
+          </LinearGradient>
+          <View style={styles.notificationContent}>
+            <View style={styles.titleRow}>
+              <Text style={styles.notificationTitle}>{item.title}</Text>
+              <View style={styles.newDot} />
+            </View>
+            <Text style={styles.notificationText}>{item.body}</Text>
+            <View style={styles.metaRow}>
+              <Text style={styles.time}>{new Date(item.created_at).toLocaleDateString('en-GB')}</Text>
+              <View style={styles.newLabel}><Text style={styles.newLabelText}>NEW</Text></View>
             </View>
           </View>
         </View>
-      </View>
-
-      {/* Notification 2 */}
-      <View style={styles.notificationCard}>
-        <LinearGradient
-          colors={['#D32F2F', '#8E1B1B']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.iconBox}
-        >
-          <Text style={styles.icon}>
-            📅
-          </Text>
-        </LinearGradient>
-
-        <View style={styles.notificationContent}>
-          <View style={styles.titleRow}>
-            <Text style={styles.notificationTitle}>
-              Upcoming Programme
-            </Text>
-
-            <View style={styles.newDot} />
-          </View>
-
-          <Text style={styles.notificationText}>
-            Salem YMA events and programmes will be
-            announced here.
-          </Text>
-
-          <View style={styles.metaRow}>
-            <Text style={styles.time}>
-              Recent
-            </Text>
-
-            <View style={styles.newLabel}>
-              <Text style={styles.newLabelText}>
-                NEW
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
+      )) : null}
 
       {/* Empty / Future Notification State */}
       <View style={styles.futureCard}>

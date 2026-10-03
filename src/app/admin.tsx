@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 
 import { supabase } from '../lib/supabase';
+import { publishNotification } from '../lib/notification-service';
 
 type Member = {
   id: number;
@@ -1049,6 +1050,77 @@ export default function AdminScreen() {
       return;
     }
 
+    const confirmed = Platform.OS === 'web'
+      ? (typeof window !== 'undefined' && window.confirm(
+          `Delete ALL ${gasBookings.length} gas booking(s)?\n\nThe bookings will be removed from the active list, but a copy will be kept in Gas Booking History. Member accounts will NOT be deleted.`
+        ))
+      : false;
+
+    const deleteBookings = async () => {
+      try {
+        const archivedAt = new Date().toISOString();
+        const archiveRows = gasBookings.map((booking) => ({
+          id: booking.id,
+          user_id: booking.user_id,
+          full_name: booking.full_name,
+          phone: booking.phone,
+          address: booking.address,
+          cylinder_quantity: booking.cylinder_quantity,
+          status: booking.status,
+          created_at: booking.created_at,
+          updated_at: booking.updated_at ?? null,
+          archived_at: archivedAt,
+        }));
+
+        const bookingIds = gasBookings.map((booking) => booking.id);
+        const { data: existingArchiveRows, error: existingArchiveError } = await supabase
+          .from('gas_booking_archive')
+          .select('id')
+          .in('id', bookingIds);
+
+        if (existingArchiveError) throw existingArchiveError;
+
+        const existingArchiveIds = new Set(
+          (existingArchiveRows ?? []).map((row: { id: number }) => row.id),
+        );
+        const archiveRowsToInsert = archiveRows.filter(
+          (row) => !existingArchiveIds.has(row.id),
+        );
+
+        if (archiveRowsToInsert.length > 0) {
+          const { error: archiveError } = await supabase
+            .from('gas_booking_archive')
+            .insert(archiveRowsToInsert);
+          if (archiveError) throw archiveError;
+        }
+
+        const { error: deleteError } = await supabase
+          .from('gas_bookings')
+          .delete()
+          .in('id', bookingIds);
+
+        if (deleteError) throw deleteError;
+
+        setGasBookings([]);
+        await loadGasBookingArchive();
+        Alert.alert(
+          'All bookings deleted',
+          'All active gas bookings were removed. Member accounts are unchanged, and the bookings are preserved in Gas Booking History.',
+        );
+      } catch (error: any) {
+        console.error('[Gas Booking] Delete all failed:', error);
+        Alert.alert(
+          'Delete failed',
+          error?.message || 'Unable to delete all gas bookings. Please check the admin database policies.',
+        );
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirmed) await deleteBookings();
+      return;
+    }
+
     Alert.alert(
       'Delete ALL gas bookings?',
       `This will remove all ${gasBookings.length} booking(s) from the active list. Member accounts will NOT be deleted. A history copy of every booking will be kept for the Gas Booking History PDF.`,
@@ -1057,48 +1129,7 @@ export default function AdminScreen() {
         {
           text: 'DELETE ALL BOOKINGS',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              const archivedAt = new Date().toISOString();
-              const archiveRows = gasBookings.map((booking) => ({
-                id: booking.id,
-                user_id: booking.user_id,
-                full_name: booking.full_name,
-                phone: booking.phone,
-                address: booking.address,
-                cylinder_quantity: booking.cylinder_quantity,
-                status: booking.status,
-                created_at: booking.created_at,
-                updated_at: booking.updated_at ?? null,
-                archived_at: archivedAt,
-              }));
-
-              const { error: archiveError } = await supabase
-                .from('gas_booking_archive')
-                .upsert(archiveRows, { onConflict: 'id' });
-
-              if (archiveError) throw archiveError;
-
-              const { error: deleteError } = await supabase
-                .from('gas_bookings')
-                .delete()
-                .in('id', gasBookings.map((booking) => booking.id));
-
-              if (deleteError) throw deleteError;
-
-              await loadGasBookings();
-              await loadGasBookingArchive();
-              Alert.alert(
-                'All bookings deleted',
-                'All active gas bookings were removed. Member accounts are unchanged, and the bookings are preserved in Gas Booking History.',
-              );
-            } catch (error: any) {
-              Alert.alert(
-                'Delete failed',
-                error?.message || 'Unable to delete all gas bookings.',
-              );
-            }
-          },
+          onPress: deleteBookings,
         },
       ],
     );
@@ -1660,6 +1691,7 @@ export default function AdminScreen() {
           .insert(payload);
 
         if (error) throw error;
+        await publishNotification('New Salem YMA News', newsTitle.trim(), { type: 'news' });
 
         Alert.alert(
           'Published',
@@ -1850,6 +1882,7 @@ export default function AdminScreen() {
           .insert({ ...payload, created_at: createdAt });
         if (error) throw error;
         setEvents(current => [{ id: Date.now(), ...payload, created_at: createdAt }, ...current]);
+        await publishNotification('New Salem YMA Programme', eventTitle.trim(), { type: 'event' });
         Alert.alert('Published','Event published successfully.');
       }
 
@@ -2008,63 +2041,64 @@ export default function AdminScreen() {
       return;
     }
 
-    Alert.alert(
+    const confirmed = await webConfirm(
       'Create bills for all members?',
       `This will create a ₹${amount.toFixed(2)} Waste Fee bill for ${eligibleMembers.length} members for ${billMonth}. Existing bills for the same member and month will be skipped.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Create Bills',
-          onPress: async () => {
-            try {
-              setCreatingAllWasteBills(true);
-
-              const userIds = eligibleMembers.map((member) => member.user_id as string);
-              const { data: existingBills, error: existingError } = await supabase
-                .from('waste_bills')
-                .select('user_id, bill_month')
-                .in('user_id', userIds)
-                .eq('bill_month', billMonth);
-
-              if (existingError) throw existingError;
-
-              const existingSet = new Set(
-                (existingBills || []).map((bill) => `${bill.user_id}:${bill.bill_month}`),
-              );
-
-              const rows = eligibleMembers
-                .filter((member) => !existingSet.has(`${member.user_id}:${billMonth}`))
-                .map((member) => ({
-                  user_id: member.user_id,
-                  account_no: `YMA-${String(member.id).padStart(4, '0')}`,
-                  bill_month: billMonth,
-                  amount,
-                  status: 'unpaid',
-                }));
-
-              if (!rows.length) {
-                Alert.alert('No new bills', `All ${eligibleMembers.length} members already have a bill for ${billMonth}.`);
-                return;
-              }
-
-              const { error } = await supabase.from('waste_bills').insert(rows);
-              if (error) throw error;
-
-              Alert.alert(
-                'Bills created',
-                `Successfully created ${rows.length} Waste Fee bill${rows.length === 1 ? '' : 's'} for ${billMonth}. ${eligibleMembers.length - rows.length} existing bill${eligibleMembers.length - rows.length === 1 ? '' : 's'} skipped.`,
-              );
-
-              await loadAll();
-            } catch (error: any) {
-              Alert.alert('Bulk bill error', error?.message || 'Unable to create bills for all members.');
-            } finally {
-              setCreatingAllWasteBills(false);
-            }
-          },
-        },
-      ],
     );
+    if (!confirmed) return;
+
+    try {
+      setCreatingAllWasteBills(true);
+
+      // Fetch only the selected month. This avoids a very large `.in(userIds)`
+      // request when the membership list grows.
+      const { data: existingBills, error: existingError } = await supabase
+        .from('waste_bills')
+        .select('user_id, bill_month')
+        .eq('bill_month', billMonth);
+
+      if (existingError) throw existingError;
+
+      const existingSet = new Set(
+        (existingBills || []).map((bill) => `${bill.user_id}:${bill.bill_month}`),
+      );
+
+      const rows = eligibleMembers
+        .filter((member) => !existingSet.has(`${member.user_id}:${billMonth}`))
+        .map((member) => ({
+          user_id: member.user_id,
+          account_no: `YMA-${String(member.id).padStart(4, '0')}`,
+          bill_month: billMonth,
+          amount,
+          status: 'unpaid',
+        }));
+
+      if (!rows.length) {
+        Alert.alert('No new bills', `All ${eligibleMembers.length} members already have a bill for ${billMonth}.`);
+        return;
+      }
+
+      // Insert in manageable batches so a larger membership list does not
+      // fail because of one oversized request.
+      const batchSize = 100;
+      for (let index = 0; index < rows.length; index += batchSize) {
+        const batch = rows.slice(index, index + batchSize);
+        const { error } = await supabase.from('waste_bills').insert(batch);
+        if (error) throw error;
+      }
+
+      Alert.alert(
+        'Bills created',
+        `Successfully created ${rows.length} Waste Fee bill${rows.length === 1 ? '' : 's'} for ${billMonth}. ${eligibleMembers.length - rows.length} existing bill${eligibleMembers.length - rows.length === 1 ? '' : 's'} skipped.`,
+      );
+
+      await loadAll();
+    } catch (error: any) {
+      console.error('[Waste Fee] Bulk bill creation failed:', error);
+      Alert.alert('Bulk bill error', error?.message || 'Unable to create bills for all members.');
+    } finally {
+      setCreatingAllWasteBills(false);
+    }
   }
 
   async function saveWasteBill() {
