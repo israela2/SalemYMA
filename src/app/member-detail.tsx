@@ -220,13 +220,13 @@ export default function MemberDetailScreen() {
     setMessage('');
     setSuccessMessage('');
 
-    const { error } = await supabase
-      .from('members')
-      .delete()
-      .eq('id', memberId);
+    const { data, error } = await supabase.rpc('admin_delete_record', {
+      p_table_name: 'members',
+      p_record_id: String(memberId),
+    });
 
-    if (error) {
-      setMessage(error.message);
+    if (error || data !== true) {
+      setMessage(error?.message || 'Unable to delete member.');
       setDeleting(false);
       return;
     }

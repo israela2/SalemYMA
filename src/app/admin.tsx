@@ -30,8 +30,8 @@ type Member = {
   full_name: string;
   phone?: string | null;
   email?: string | null;
-  section?: string | null;
   branch_name?: string | null;
+  section?: string | null;
   house_number?: string | null;
   status?: string | null;
   created_at?: string | null;
@@ -159,6 +159,8 @@ function normalizeBranchLeaderPosition(position: string) {
   return LEGACY_BRANCH_POSITION_MAP[position] ?? position;
 }
 
+const CEMETERY_REGISTER_CATEGORIES = ['Row A', 'Row B', 'Row C', 'Naupang Thlan', 'Hlamzuih Thlan'] as const;
+const CEMETERY_GRAVE_ICON = require('./assets/grave-icon.png');
 const SECTION_NAMES = ['Section I', 'Section II', 'Section III'];
 const SECTION_LEADER_POSITIONS = ['Leader','Assistant Leader','Secretary','Assistant Secretary','Treasurer','Finance Secretary'];
 const LEGACY_SECTION_POSITION_MAP: Record<string, string> = {
@@ -196,22 +198,17 @@ function normalizeSectionName(section: string) {
 type CemeteryRecord = {
   id: number;
   deceased_name: string;
+  photo_url?: string | null;
+  age_at_death?: number | null;
   date_of_birth?: string | null;
   date_of_death?: string | null;
-  burial_date?: string | null;
   cemetery_name?: string | null;
-  section?: string | null;
   row_name?: string | null;
   grave_number?: string | null;
   family_name?: string | null;
-  family_contact_name?: string | null;
   family_contact_phone?: string | null;
   biography?: string | null;
   grave_photo_url?: string | null;
-  document_url?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  notes?: string | null;
   is_published?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -296,7 +293,9 @@ function WebEventDateInput({ value, onChange, mode }: { value: Date | null; onCh
 function formatDate(value?: string | null) {
   if (!value) return '-';
 
-  const date = new Date(value);
+  const trimmed = value.trim();
+  if (/^\d{4}$/.test(trimmed)) return trimmed;
+  const date = new Date(trimmed);
 
   if (Number.isNaN(date.getTime())) return value;
 
@@ -306,21 +305,53 @@ function formatDate(value?: string | null) {
 function normalizeDateInput(value?: string | null) {
   if (!value) return '';
   const trimmed = value.trim();
+
+  // Accept either a complete date (DD/MM/YYYY) or year only (YYYY).
   const ddmmyyyy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
-  if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+  if (ddmmyyyy) {
+    const day = Number(ddmmyyyy[1]);
+    const month = Number(ddmmyyyy[2]);
+    const year = Number(ddmmyyyy[3]);
+    const candidate = new Date(year, month - 1, day);
+    if (
+      candidate.getFullYear() !== year ||
+      candidate.getMonth() !== month - 1 ||
+      candidate.getDate() !== day
+    ) return '';
+    return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+  }
+
+  const yearOnly = /^(\d{4})$/.exec(trimmed);
+  if (yearOnly) return yearOnly[1];
+
   const yyyymmdd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
   if (yyyymmdd) return trimmed;
+
   return trimmed;
 }
 
 function displayDateInput(value?: string | null) {
   if (!value) return '';
   const trimmed = value.trim();
+
+  // Preserve year-only values exactly as entered.
+  if (/^\d{4}$/.test(trimmed)) return trimmed;
+
   const ddmmyyyy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
   if (ddmmyyyy) return trimmed;
+
   const yyyymmdd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
   if (yyyymmdd) return `${yyyymmdd[3]}/${yyyymmdd[2]}/${yyyymmdd[1]}`;
+
   return formatDate(trimmed) !== '-' ? formatDate(trimmed) : trimmed;
+}
+
+function validateCemeteryDateInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  if (/^\d{4}$/.test(trimmed)) return true;
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) return false;
+  return normalizeDateInput(trimmed) !== '';
 }
 
 function formatDateTime(value?: string | null) {
@@ -539,6 +570,31 @@ function getZonunStoragePathFromUrl(url?: string | null) {
   );
 }
 
+async function adminDeleteRecord(table: string, id: string | number) {
+  const allowed = new Set([
+    'news',
+    'events',
+    'gallery',
+    'gallery_albums',
+    'waste_bills',
+    'zonun',
+    'branch_leaders',
+    'section_leaders',
+    'cemetery_records',
+    'gas_bookings',
+    'chhiatni_fund_bills',
+    'members',
+  ]);
+  if (!allowed.has(table)) throw new Error(`Delete operation is not allowed for ${table}.`);
+  const { data, error } = await supabase.rpc('admin_delete_record', {
+    p_table_name: table,
+    p_record_id: String(id),
+  });
+  if (error) throw error;
+  if (data !== true) throw new Error(`The database did not confirm deletion from ${table}.`);
+  return true;
+}
+
 export default function AdminScreen() {
   const [loading, setLoading] = useState(true);
   const loadGeneration = useRef(0);
@@ -600,27 +656,24 @@ export default function AdminScreen() {
 
   const [cemeterySearch, setCemeterySearch] = useState('');
   const [cemeteryDeceasedName, setCemeteryDeceasedName] = useState('');
+  const [cemeteryPhoto, setCemeteryPhoto] = useState('');
+  const [cemeteryAgeAtDeath, setCemeteryAgeAtDeath] = useState('');
   const [cemeteryDateOfBirth, setCemeteryDateOfBirth] = useState('');
   const [cemeteryDateOfDeath, setCemeteryDateOfDeath] = useState('');
-  const [cemeteryBurialDate, setCemeteryBurialDate] = useState('');
   const [cemeteryName, setCemeteryName] = useState('Salem Cemetery');
-  const [cemeterySection, setCemeterySection] = useState('');
   const [cemeteryRowName, setCemeteryRowName] = useState('');
   const [cemeteryGraveNumber, setCemeteryGraveNumber] = useState('');
+  const [cemeteryAddToExistingGrave, setCemeteryAddToExistingGrave] = useState(false);
   const [cemeteryFamilyName, setCemeteryFamilyName] = useState('');
-  const [cemeteryFamilyContactName, setCemeteryFamilyContactName] = useState('');
   const [cemeteryFamilyContactPhone, setCemeteryFamilyContactPhone] = useState('');
   const [cemeteryBiography, setCemeteryBiography] = useState('');
   const [cemeteryGravePhoto, setCemeteryGravePhoto] = useState('');
-  const [cemeteryDocumentUrl, setCemeteryDocumentUrl] = useState('');
-  const [cemeteryLatitude, setCemeteryLatitude] = useState('');
-  const [cemeteryLongitude, setCemeteryLongitude] = useState('');
-  const [cemeteryNotes, setCemeteryNotes] = useState('');
   const [cemeteryPublished, setCemeteryPublished] = useState(true);
   const [editingCemeteryId, setEditingCemeteryId] = useState<number | null>(null);
   const [savingCemetery, setSavingCemetery] = useState(false);
   const [cemeteryPhotoUploading, setCemeteryPhotoUploading] = useState(false);
   const [cemeteryDocumentUploading, setCemeteryDocumentUploading] = useState(false);
+  const [cemeterySaveError, setCemeterySaveError] = useState('');
 
   const [leaderPosition, setLeaderPosition] = useState('President');
   const [leaderFullName, setLeaderFullName] = useState('');
@@ -1157,12 +1210,9 @@ export default function AdminScreen() {
           if (archiveError) throw archiveError;
         }
 
-        const { error: deleteError } = await supabase
-          .from('gas_bookings')
-          .delete()
-          .in('id', bookingIds);
-
-        if (deleteError) throw deleteError;
+        for (const bookingId of bookingIds) {
+          await adminDeleteRecord('gas_bookings', bookingId);
+        }
 
         setGasBookings([]);
         await loadGasBookingArchive();
@@ -1319,22 +1369,60 @@ export default function AdminScreen() {
       if (adminAccount.role === 'cemetery_admin') {
         setSection('cemetery');
 
-        const { data, error } = await supabase
-          .from('cemetery_records')
-          .select('*')
-          .order('deceased_name', {
-            ascending: true,
-          });
+        // Fetch every cemetery record in pages. This avoids a project/API
+        // max-rows setting from making the admin appear to stop after a few
+        // records (for example, after 4 records).
+        const allCemeteryRows: any[] = [];
+        let cemeteryOffset = 0;
+        const cemeteryPageSize = 100;
+        let cemeteryFetchError: any = null;
 
-        if (!error) {
-          setCemeteryRecords(
-            (data || []) as CemeteryRecord[],
+        while (true) {
+          const { data, error } = await supabase
+            .from('cemetery_records')
+            .select('*')
+            .order('deceased_name', { ascending: true })
+            .order('id', { ascending: true })
+            .range(cemeteryOffset, cemeteryOffset + cemeteryPageSize - 1);
+
+          if (error) {
+            cemeteryFetchError = error;
+            break;
+          }
+
+          const page = data || [];
+          allCemeteryRows.push(...page);
+          if (page.length === 0) break;
+          cemeteryOffset += page.length;
+          // If the backend returns a partial page, we have reached the end.
+          if (page.length < cemeteryPageSize) {
+            // Some Supabase projects have a lower API max-rows setting.
+            // Probe the next range once so records beyond that cap are not lost.
+            const { data: probe, error: probeError } = await supabase
+              .from('cemetery_records')
+              .select('*')
+              .order('deceased_name', { ascending: true })
+              .order('id', { ascending: true })
+              .range(cemeteryOffset, cemeteryOffset + cemeteryPageSize - 1);
+            if (probeError) {
+              cemeteryFetchError = probeError;
+              break;
+            }
+            if (!probe || probe.length === 0) break;
+            allCemeteryRows.push(...probe);
+            cemeteryOffset += probe.length;
+          }
+        }
+
+        if (!cemeteryFetchError) {
+          // De-duplicate rows by id because the probe above can overlap only
+          // when a backend applies an unusual range limit.
+          const uniqueRows = Array.from(
+            new Map(allCemeteryRows.map((row) => [String(row.id), row])).values(),
           );
+          setCemeteryRecords(uniqueRows as CemeteryRecord[]);
         } else {
-          console.log(
-            'Cemetery Admin load error:',
-            error.message,
-          );
+          console.log('Cemetery Admin load error:', cemeteryFetchError.message);
           setCemeteryRecords([]);
         }
 
@@ -1582,16 +1670,6 @@ export default function AdminScreen() {
     }, []),
   );
 
-  // Reload the member list whenever Admin screen regains focus.
-  // This ensures a member deleted from Member Edit disappears immediately.
-  useFocusEffect(
-    React.useCallback(() => {
-      if (!loading) {
-        loadAll();
-      }
-    }, []),
-  );
-
   async function refresh() {
     setRefreshing(true);
     await loadAll();
@@ -1738,17 +1816,10 @@ export default function AdminScreen() {
         .eq('category', album.title);
       if (photoLoadError) throw photoLoadError;
 
-      const { error: photoDeleteError } = await supabase
-        .from('gallery')
-        .delete()
-        .eq('category', album.title);
-      if (photoDeleteError) throw photoDeleteError;
-
-      const { error: albumDeleteError } = await supabase
-        .from('gallery_albums')
-        .delete()
-        .eq('id', album.id);
-      if (albumDeleteError) throw albumDeleteError;
+      for (const photo of photos || []) {
+        await adminDeleteRecord('gallery', photo.id);
+      }
+      await adminDeleteRecord('gallery_albums', album.id);
 
       setGalleryAlbums((current) => current.filter((item) => item.id !== album.id));
       if (selectedGalleryAlbum === album.title) {
@@ -1980,8 +2051,7 @@ export default function AdminScreen() {
   async function deleteNews(item: NewsItem) {
     if (!(await webConfirm('Delete news?', `Delete "${item.title}" permanently?`))) return;
     try {
-      const { error } = await supabase.from('news').delete().eq('id', item.id);
-      if (error) throw error;
+      await adminDeleteRecord('news', item.id);
       await loadAll();
     } catch (error: any) {
       Alert.alert('Delete failed', error?.message || 'Unable to delete news.');
@@ -2125,7 +2195,7 @@ export default function AdminScreen() {
           .from('events')
           .insert({ ...payload, created_at: createdAt });
         if (error) throw error;
-        setEvents(current => [{ id: Date.now(), ...payload, created_at: createdAt }, ...current]);
+        await loadAll();
         await publishNotification('New YMA Salem Branch Programme', eventTitle.trim(), { type: 'event' });
         Alert.alert('Published','Event published successfully.');
       }
@@ -2168,8 +2238,7 @@ export default function AdminScreen() {
   async function deleteEvent(item: EventItem) {
     if (!(await webConfirm('Delete event?', `Delete "${item.title}" permanently?`))) return;
     try {
-      const { error } = await supabase.from('events').delete().eq('id', item.id);
-      if (error) throw error;
+      await adminDeleteRecord('events', item.id);
       await loadAll();
     } catch (error: any) {
       Alert.alert('Delete failed', error?.message || 'Unable to delete event.');
@@ -2184,11 +2253,7 @@ export default function AdminScreen() {
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase
-        .from('gallery')
-        .delete()
-        .eq('id', item.id);
-      if (error) throw error;
+      await adminDeleteRecord('gallery', item.id);
 
       const storagePath = getStoragePathFromUrl(item.image_url);
       let storageCleanupFailed = false;
@@ -2425,13 +2490,55 @@ export default function AdminScreen() {
   }
 
   async function deleteWasteBill(bill: WasteBill) {
-    if (!(await webConfirm('Delete bill?', `Delete ${bill.bill_month || 'this bill'} permanently?`))) return;
+    const confirmed = await webConfirm(
+      'Delete bill?',
+      `Delete ${bill.bill_month || 'this bill'} permanently?`,
+    );
+    if (!confirmed) return;
+
     try {
-      const { error } = await supabase.from('waste_bills').delete().eq('id', bill.id);
-      if (error) throw error;
+      // Waste Fee bills are deleted directly first. This avoids the old
+      // admin_delete_record RPC blocking the confirmed delete when its
+      // database function is missing/outdated.
+      const { error: directDeleteError } = await supabase
+        .from('waste_bills')
+        .delete()
+        .eq('id', bill.id);
+
+      if (directDeleteError) {
+        // Keep the existing RPC as a fallback for projects where the
+        // direct DELETE policy is intentionally restricted.
+        await adminDeleteRecord('waste_bills', bill.id);
+      }
+
+      // Verify that the confirmed record is actually gone.
+      const { data: stillExists, error: verifyError } = await supabase
+        .from('waste_bills')
+        .select('id')
+        .eq('id', bill.id)
+        .maybeSingle();
+
+      if (verifyError) throw verifyError;
+      if (stillExists) {
+        throw new Error(
+          'The Waste Fee bill is still in the database. Please run the Waste Fee DELETE policy/RPC SQL in Supabase.',
+        );
+      }
+
+      // Remove it immediately from the current screen.
+      setWasteBills((current) =>
+        current.filter((item) => String(item.id) !== String(bill.id)),
+      );
+
       await loadAll();
+      webNotify('Deleted', `${bill.bill_month || 'Waste Fee bill'} has been deleted successfully.`);
     } catch (error: any) {
-      Alert.alert('Delete failed', error?.message || 'Unable to delete bill.');
+      console.error('[Waste Fee] Delete failed:', error);
+      Alert.alert(
+        'Delete failed',
+        error?.message || 'Unable to delete bill. Check the Waste Fee delete policy/RPC in Supabase.',
+      );
+      await loadAll();
     }
   }
 
@@ -2561,8 +2668,7 @@ export default function AdminScreen() {
   async function deleteZonun(item: ZonunItem) {
     if (!(await webConfirm('Delete Zonun?', `Delete "${item.title}" permanently?`))) return;
     try {
-      const { error } = await supabase.from('zonun').delete().eq('id', item.id);
-      if (error) throw error;
+      await adminDeleteRecord('zonun', item.id);
       const storagePath = getZonunStoragePathFromUrl(item.pdf_url);
       if (storagePath) { try { await supabase.storage.from('zonun').remove([storagePath]); } catch {} }
       await loadAll();
@@ -2709,8 +2815,7 @@ export default function AdminScreen() {
   async function deleteBranchLeader(item: BranchLeader) {
     if (!(await webConfirm('Delete branch leader?', `Delete ${item.full_name} from Branch Leaders?`))) return;
     try {
-      const { error } = await supabase.from('branch_leaders').delete().eq('id', item.id);
-      if (error) throw error;
+      await adminDeleteRecord('branch_leaders', item.id);
       const storagePath = getStoragePathFromUrl(item.photo_url);
       if (storagePath) { try { await supabase.storage.from('gallery').remove([storagePath]); } catch {} }
       if (editingLeaderId === item.id) resetLeaderForm();
@@ -2746,20 +2851,9 @@ export default function AdminScreen() {
           console.error('[Section Hruaitu] Supabase insert failed:', error);
           throw error;
         }
-        // Do not use insert().select() here: a SELECT/RLS restriction can make
-        // an otherwise successful INSERT look like a failed add. The form is
-        // already holding the exact values, so show the new leader locally.
-        const localItem: SectionLeader = {
-          id: Date.now(),
-          section: normalizeSectionName(payload.section),
-          position: normalizeSectionLeaderPosition(sectionLeaderPosition),
-          full_name: payload.full_name,
-          phone: payload.phone,
-          photo_url: payload.photo_url,
-          display_order: payload.display_order,
-          is_active: payload.is_active,
-        };
-        setSectionLeaders(current => [...current, localItem]);
+        // Reload the row from Supabase so the real database id is used.
+        // A client-generated temporary id would make immediate Edit/Delete unreliable.
+        await loadAll();
         Alert.alert('Added','Section leader added successfully.');
       }
       resetSectionLeaderForm();
@@ -2769,8 +2863,7 @@ export default function AdminScreen() {
   async function deleteSectionLeader(item: SectionLeader) {
     if (!(await webConfirm('Delete section leader?', `Delete ${item.full_name} from ${item.section}?`))) return;
     try {
-      const { error } = await supabase.from('section_leaders').delete().eq('id', item.id);
-      if (error) throw error;
+      await adminDeleteRecord('section_leaders', item.id);
       const storagePath = getStoragePathFromUrl(item.photo_url);
       if (storagePath) { try { await supabase.storage.from('gallery').remove([storagePath]); } catch {} }
       if (editingSectionLeaderId === item.id) resetSectionLeaderForm();
@@ -2780,208 +2873,80 @@ export default function AdminScreen() {
     }
   }
 
+  function getCemeteryGravePrefix(category: string) {
+    const value = category.trim().toLowerCase();
+    if (value === 'row a') return 'A';
+    if (value === 'row b') return 'B';
+    if (value === 'row c') return 'C';
+    if (value === 'naupang thlan') return 'N';
+    if (value === 'hlamzuih thlan') return 'H';
+    return 'A';
+  }
+
+  async function getNextCemeteryGraveNumber(category: string, cemetery: string) {
+    const prefix = getCemeteryGravePrefix(category);
+    const allRows: any[] = [];
+    let offset = 0;
+    const pageSize = 100;
+    while (true) {
+      const { data, error } = await supabase
+        .from('cemetery_records')
+        .select('id,grave_number')
+        .eq('cemetery_name', cemetery)
+        .eq('row_name', category)
+        .order('id', { ascending: true })
+        .range(offset, offset + pageSize - 1);
+      if (error) throw error;
+      const page = data || [];
+      allRows.push(...page);
+      if (page.length === 0) break;
+      offset += page.length;
+      if (page.length < pageSize) {
+        const { data: probe, error: probeError } = await supabase
+          .from('cemetery_records')
+          .select('id,grave_number')
+          .eq('cemetery_name', cemetery)
+          .eq('row_name', category)
+          .order('id', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (probeError) throw probeError;
+        if (!probe || probe.length === 0) break;
+        allRows.push(...probe);
+        offset += probe.length;
+      }
+    }
+
+    let maxNumber = 0;
+    allRows.forEach((record: any) => {
+      const value = String(record?.grave_number || '').trim().toUpperCase();
+      const match = value.match(new RegExp(`^${prefix}-(\\d+)$`));
+      if (match) {
+        const number = Number(match[1]);
+        if (Number.isFinite(number)) maxNumber = Math.max(maxNumber, number);
+      }
+    });
+
+    return `${prefix}-${String(maxNumber + 1).padStart(2, '0')}`;
+  }
+
   function resetCemeteryForm() {
     setCemeteryDeceasedName('');
+    setCemeteryPhoto('');
+    setCemeteryAgeAtDeath('');
     setCemeteryDateOfBirth('');
     setCemeteryDateOfDeath('');
-    setCemeteryBurialDate('');
     setCemeteryName('Salem Cemetery');
-    setCemeterySection('');
     setCemeteryRowName('');
     setCemeteryGraveNumber('');
+    setCemeteryAddToExistingGrave(false);
     setCemeteryFamilyName('');
-    setCemeteryFamilyContactName('');
     setCemeteryFamilyContactPhone('');
     setCemeteryBiography('');
     setCemeteryGravePhoto('');
-    setCemeteryDocumentUrl('');
-    setCemeteryLatitude('');
-    setCemeteryLongitude('');
-    setCemeteryNotes('');
     setCemeteryPublished(true);
     setEditingCemeteryId(null);
-  }
-
-  function editCemeteryRecord(item: CemeteryRecord) {
-    setEditingCemeteryId(item.id);
-    setCemeteryDeceasedName(item.deceased_name || '');
-    setCemeteryDateOfBirth(displayDateInput(item.date_of_birth));
-    setCemeteryDateOfDeath(displayDateInput(item.date_of_death));
-    setCemeteryBurialDate(displayDateInput(item.burial_date));
-    setCemeteryName(item.cemetery_name || 'Salem Cemetery');
-    setCemeterySection(item.section || '');
-    setCemeteryRowName(item.row_name || '');
-    setCemeteryGraveNumber(item.grave_number || '');
-    setCemeteryFamilyName(item.family_name || '');
-    setCemeteryFamilyContactName(item.family_contact_name || '');
-    setCemeteryFamilyContactPhone(item.family_contact_phone || '');
-    setCemeteryBiography(item.biography || '');
-    setCemeteryGravePhoto(item.grave_photo_url || '');
-    setCemeteryDocumentUrl(item.document_url || '');
-    setCemeteryLatitude(
-      item.latitude === null || item.latitude === undefined
-        ? ''
-        : String(item.latitude),
-    );
-    setCemeteryLongitude(
-      item.longitude === null || item.longitude === undefined
-        ? ''
-        : String(item.longitude),
-    );
-    setCemeteryNotes(item.notes || '');
-    setCemeteryPublished(item.is_published !== false);
     setSection('cemetery');
   }
-
-  async function saveCemeteryRecord() {
-    if (!cemeteryDeceasedName.trim()) {
-      Alert.alert(
-        'Missing name',
-        'Please enter the deceased person name.',
-      );
-      return;
-    }
-
-    const latitude = cemeteryLatitude.trim()
-      ? Number(cemeteryLatitude.trim())
-      : null;
-    const longitude = cemeteryLongitude.trim()
-      ? Number(cemeteryLongitude.trim())
-      : null;
-
-    if (
-      latitude !== null &&
-      !Number.isFinite(latitude)
-    ) {
-      Alert.alert('Invalid latitude', 'Please enter a valid latitude.');
-      return;
-    }
-
-    if (
-      longitude !== null &&
-      !Number.isFinite(longitude)
-    ) {
-      Alert.alert('Invalid longitude', 'Please enter a valid longitude.');
-      return;
-    }
-
-    try {
-      setSavingCemetery(true);
-
-      const payload = {
-        deceased_name: cemeteryDeceasedName.trim(),
-        date_of_birth: normalizeDateInput(cemeteryDateOfBirth) || null,
-        date_of_death: normalizeDateInput(cemeteryDateOfDeath) || null,
-        burial_date: normalizeDateInput(cemeteryBurialDate) || null,
-        cemetery_name: cemeteryName.trim() || 'Salem Cemetery',
-        section: cemeterySection.trim() || null,
-        row_name: cemeteryRowName.trim() || null,
-        grave_number: cemeteryGraveNumber.trim() || null,
-        family_name: cemeteryFamilyName.trim() || null,
-        family_contact_name: cemeteryFamilyContactName.trim() || null,
-        family_contact_phone: cemeteryFamilyContactPhone.trim() || null,
-        biography: cemeteryBiography.trim() || null,
-        grave_photo_url: cemeteryGravePhoto.trim() || null,
-        document_url: cemeteryDocumentUrl.trim() || null,
-        latitude,
-        longitude,
-        notes: cemeteryNotes.trim() || null,
-        is_published: cemeteryPublished,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (editingCemeteryId) {
-        const { error } = await supabase
-          .from('cemetery_records')
-          .update(payload)
-          .eq('id', editingCemeteryId);
-
-        if (error) throw error;
-
-        Alert.alert(
-          'Updated',
-          'Cemetery record updated successfully.',
-        );
-      } else {
-        const { error } = await supabase
-          .from('cemetery_records')
-          .insert(payload);
-
-        if (error) throw error;
-
-        Alert.alert(
-          'Added',
-          'Cemetery record added successfully.',
-        );
-      }
-
-      resetCemeteryForm();
-      await loadAll();
-    } catch (error: any) {
-      Alert.alert(
-        'Save failed',
-        error?.message || 'Unable to save cemetery record.',
-      );
-    } finally {
-      setSavingCemetery(false);
-    }
-  }
-
-  async function toggleCemeteryRecord(item: CemeteryRecord) {
-    try {
-      const { error } = await supabase
-        .from('cemetery_records')
-        .update({
-          is_published: !item.is_published,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', item.id);
-
-      if (error) throw error;
-      await loadAll();
-    } catch (error: any) {
-      Alert.alert(
-        'Update failed',
-        error?.message || 'Unable to change cemetery record visibility.',
-      );
-    }
-  }
-
-  async function deleteCemeteryRecord(item: CemeteryRecord) {
-    Alert.alert(
-      'Delete cemetery record?',
-      `Delete the record for "${item.deceased_name}" permanently?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('cemetery_records')
-                .delete()
-                .eq('id', item.id);
-
-              if (error) throw error;
-
-              if (editingCemeteryId === item.id) {
-                resetCemeteryForm();
-              }
-
-              await loadAll();
-            } catch (error: any) {
-              Alert.alert(
-                'Delete failed',
-                error?.message || 'Unable to delete cemetery record.',
-              );
-            }
-          },
-        },
-      ],
-    );
-  }
-
 
   async function updateGasBookingStatus(
     booking: GasBooking,
@@ -3082,28 +3047,38 @@ export default function AdminScreen() {
   function editCemetery(item: CemeteryRecord) {
     setEditingCemeteryId(item.id);
     setCemeteryDeceasedName(item.deceased_name || '');
+    setCemeteryPhoto(item.photo_url || '');
+    setCemeteryAgeAtDeath(item.age_at_death == null ? '' : String(item.age_at_death));
     setCemeteryDateOfBirth(displayDateInput(item.date_of_birth));
     setCemeteryDateOfDeath(displayDateInput(item.date_of_death));
-    setCemeteryBurialDate(displayDateInput(item.burial_date));
     setCemeteryName(item.cemetery_name || 'Salem Cemetery');
-    setCemeterySection(item.section || '');
     setCemeteryRowName(item.row_name || '');
     setCemeteryGraveNumber(item.grave_number || '');
     setCemeteryFamilyName(item.family_name || '');
-    setCemeteryFamilyContactName(item.family_contact_name || '');
     setCemeteryFamilyContactPhone(item.family_contact_phone || '');
     setCemeteryBiography(item.biography || '');
     setCemeteryGravePhoto(item.grave_photo_url || '');
-    setCemeteryDocumentUrl(item.document_url || '');
-    setCemeteryLatitude(
-      item.latitude == null ? '' : String(item.latitude),
-    );
-    setCemeteryLongitude(
-      item.longitude == null ? '' : String(item.longitude),
-    );
-    setCemeteryNotes(item.notes || '');
     setCemeteryPublished(item.is_published !== false);
     setSection('cemetery');
+  }
+
+  async function pickCemeteryPersonPhoto() {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.9,
+      });
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+      setCemeteryPhotoUploading(true);
+      const url = await uploadImage(result.assets[0].uri, 'cemetery/person');
+      setCemeteryPhoto(url);
+    } catch (error: any) {
+      Alert.alert('Photo upload failed', error?.message || 'Unable to upload photo.');
+    } finally {
+      setCemeteryPhotoUploading(false);
+    }
   }
 
   async function pickCemeteryPhoto() {
@@ -3134,42 +3109,26 @@ export default function AdminScreen() {
     }
   }
 
-  async function pickCemeteryDocument() {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-
-      if (result.canceled || !result.assets?.[0]?.uri) return;
-
-      setCemeteryDocumentUploading(true);
-      const url = await uploadCemeteryDocument(
-        result.assets[0].uri,
-      );
-      setCemeteryDocumentUrl(url);
-
-      Alert.alert(
-        'Document uploaded',
-        'The old cemetery record PDF is ready.',
-      );
-    } catch (error: any) {
-      Alert.alert(
-        'Document upload failed',
-        error?.message || 'Unable to upload document.',
-      );
-    } finally {
-      setCemeteryDocumentUploading(false);
-    }
-  }
-
   async function saveCemetery() {
+    setCemeterySaveError('');
     if (!cemeteryDeceasedName.trim()) {
-      Alert.alert(
-        'Missing name',
-        'Please enter the deceased person\'s name.',
-      );
+      Alert.alert('Missing name', 'Please enter the deceased person\'s name.');
+      return;
+    }
+    if (!cemeteryRowName.trim()) {
+      Alert.alert('Select register', 'Please select Row A, Row B, Row C, Naupang Thlan or Hlamzuih Thlan.');
+      return;
+    }
+    if (cemeteryAgeAtDeath.trim() && !Number.isFinite(Number(cemeteryAgeAtDeath.trim()))) {
+      Alert.alert('Invalid age', 'Mitthi kum zat chu number-in ziak rawh.');
+      return;
+    }
+    if (!validateCemeteryDateInput(cemeteryDateOfBirth)) {
+      Alert.alert('Invalid Date of Birth', 'DD/MM/YYYY emaw YYYY chauh ziak rawh. Date of Birth chu optional a ni.');
+      return;
+    }
+    if (!validateCemeteryDateInput(cemeteryDateOfDeath)) {
+      Alert.alert('Invalid Date of Death', 'DD/MM/YYYY emaw YYYY chauh ziak rawh. Date of Death chu optional a ni.');
       return;
     }
 
@@ -3178,46 +3137,24 @@ export default function AdminScreen() {
 
       const payload = {
         deceased_name: cemeteryDeceasedName.trim(),
+        photo_url: cemeteryPhoto.trim() || null,
+        age_at_death: cemeteryAgeAtDeath.trim() ? Number(cemeteryAgeAtDeath.trim()) : null,
         date_of_birth: normalizeDateInput(cemeteryDateOfBirth) || null,
         date_of_death: normalizeDateInput(cemeteryDateOfDeath) || null,
-        burial_date: normalizeDateInput(cemeteryBurialDate) || null,
         cemetery_name: cemeteryName.trim() || 'Salem Cemetery',
-        section: cemeterySection.trim() || null,
         row_name: cemeteryRowName.trim() || null,
         grave_number: cemeteryGraveNumber.trim() || null,
         family_name: cemeteryFamilyName.trim() || null,
-        family_contact_name:
-          cemeteryFamilyContactName.trim() || null,
         family_contact_phone:
           cemeteryFamilyContactPhone.trim() || null,
         biography: cemeteryBiography.trim() || null,
         grave_photo_url: cemeteryGravePhoto.trim() || null,
-        document_url: cemeteryDocumentUrl.trim() || null,
-        latitude: cemeteryLatitude.trim()
-          ? Number(cemeteryLatitude.trim())
-          : null,
-        longitude: cemeteryLongitude.trim()
-          ? Number(cemeteryLongitude.trim())
-          : null,
-        notes: cemeteryNotes.trim() || null,
         is_published: cemeteryPublished,
         updated_at: new Date().toISOString(),
       };
 
-      if (
-        (payload.latitude !== null &&
-          Number.isNaN(payload.latitude)) ||
-        (payload.longitude !== null &&
-          Number.isNaN(payload.longitude))
-      ) {
-        Alert.alert(
-          'Invalid location',
-          'Latitude and longitude must be valid numbers.',
-        );
-        return;
-      }
-
       if (editingCemeteryId) {
+        // Existing grave numbers are preserved while editing a record.
         const { error } = await supabase
           .from('cemetery_records')
           .update(payload)
@@ -3227,22 +3164,50 @@ export default function AdminScreen() {
 
         Alert.alert('Updated', 'Cemetery record updated successfully.');
       } else {
-        const { error } = await supabase
+        // A new person can either get the next automatic grave number,
+        // or be added to an existing grave. This intentionally allows
+        // multiple deceased records to share one grave number.
+        let graveNumber = cemeteryGraveNumber.trim();
+
+        if (cemeteryAddToExistingGrave) {
+          if (!graveNumber) {
+            throw new Error('Select an existing Grave No. first.');
+          }
+        } else {
+          graveNumber = await getNextCemeteryGraveNumber(
+            cemeteryRowName.trim(),
+            cemeteryName.trim() || 'Salem Cemetery',
+          );
+        }
+
+        const insertPayload = { ...payload, grave_number: graveNumber };
+        const { data: insertedRecord, error } = await supabase
           .from('cemetery_records')
-          .insert(payload);
+          .insert(insertPayload)
+          .select('*')
+          .single();
 
-        if (error) throw error;
+        if (error) {
+          throw new Error(
+            `Database insert failed (${error.code || 'unknown'}): ${error.message || 'Unknown database error'}`
+          );
+        }
+        if (!insertedRecord?.id) {
+          throw new Error('The database did not return the newly saved cemetery record.');
+        }
 
-        Alert.alert('Saved', 'Cemetery record added successfully.');
+        Alert.alert(
+          'Saved',
+          `Cemetery record added successfully.\nGrave No.: ${graveNumber}`,
+        );
       }
 
       resetCemeteryForm();
       await loadAll();
     } catch (error: any) {
-      Alert.alert(
-        'Save failed',
-        error?.message || 'Unable to save cemetery record.',
-      );
+      const message = error?.message || 'Unable to save cemetery record.';
+      setCemeterySaveError(message);
+      Alert.alert('Save failed', message);
     } finally {
       setSavingCemetery(false);
     }
@@ -3269,55 +3234,52 @@ export default function AdminScreen() {
   }
 
   async function deleteCemetery(item: CemeteryRecord) {
-    Alert.alert(
+    const confirmed = await webConfirm(
       'Delete Cemetery Record?',
       `Delete "${item.deceased_name}" permanently?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('cemetery_records')
-                .delete()
-                .eq('id', item.id);
-
-              if (error) throw error;
-
-              const photoPath = getStoragePathFromUrl(
-                item.grave_photo_url,
-              );
-              const documentPath = getStoragePathFromUrl(
-                item.document_url,
-              );
-
-              const paths = [photoPath, documentPath].filter(
-                (path): path is string => !!path,
-              );
-
-              if (paths.length) {
-                await supabase.storage
-                  .from('gallery')
-                  .remove(paths);
-              }
-
-              if (editingCemeteryId === item.id) {
-                resetCemeteryForm();
-              }
-
-              await loadAll();
-            } catch (error: any) {
-              Alert.alert(
-                'Delete failed',
-                error?.message || 'Unable to delete cemetery record.',
-              );
-            }
-          },
-        },
-      ],
     );
+    if (!confirmed) return;
+
+    try {
+      // Cemetery records use a dedicated SECURITY DEFINER RPC. This avoids
+      // the old admin_delete_record role check that can reject a valid Full Admin
+      // with "Cemetery administrator permission required".
+      const { data: deleted, error: deleteError } = await supabase.rpc(
+        'admin_delete_cemetery_record',
+        { p_record_id: item.id },
+      );
+      if (deleteError) throw deleteError;
+      if (deleted !== true) {
+        throw new Error('The database did not confirm deletion of the cemetery record.');
+      }
+
+      const photoPath = getStoragePathFromUrl(item.grave_photo_url);
+      if (photoPath) {
+        const { error: storageError } = await supabase.storage
+          .from('gallery')
+          .remove([photoPath]);
+        if (storageError) {
+          console.warn(
+            'Cemetery record deleted, but photo cleanup failed:',
+            storageError.message,
+          );
+        }
+      }
+
+      if (editingCemeteryId === item.id) {
+        resetCemeteryForm();
+      }
+
+      // Remove it immediately from the local list, then refresh from DB.
+      setCemeteryRecords((current) => current.filter((record) => record.id !== item.id));
+      await loadAll();
+      webNotify('Deleted', `"${item.deceased_name}" has been deleted successfully.`);
+    } catch (error: any) {
+      webNotify(
+        'Delete failed',
+        error?.message || 'Unable to delete cemetery record. Run cemetery_delete_policy.sql in Supabase SQL Editor.',
+      );
+    }
   }
 
   const filteredCemeteryRecords = useMemo(() => {
@@ -3329,7 +3291,6 @@ export default function AdminScreen() {
         item.deceased_name,
         item.family_name,
         item.cemetery_name,
-        item.section,
         item.row_name,
         item.grave_number,
         item.biography,
@@ -3565,7 +3526,7 @@ export default function AdminScreen() {
           </ScrollView>
         ) : (
           <View style={styles.cemeteryOnlyBanner}>
-            <Text style={styles.cemeteryOnlyIcon}>🪦</Text>
+            <Image source={CEMETERY_GRAVE_ICON} style={styles.cemeteryOnlyIcon} resizeMode="contain" />
             <View style={{ flex: 1 }}>
               <Text style={styles.cemeteryOnlyTitle}>
                 CEMETERY ADMIN
@@ -3897,7 +3858,7 @@ export default function AdminScreen() {
                 onPress={() => setSection('cemetery')}
               >
                 <View style={styles.cemeteryStatIcon}>
-                  <Text style={styles.cemeteryStatIconText}>🪦</Text>
+                  <Image source={CEMETERY_GRAVE_ICON} style={styles.cemeteryStatIconText} resizeMode="contain" />
                 </View>
                 <View>
                   <Text style={styles.statNumber}>
@@ -6255,7 +6216,7 @@ export default function AdminScreen() {
 
             <View style={styles.cemeteryAdminSummary}>
               <View style={styles.cemeteryAdminSummaryIcon}>
-                <Text style={styles.cemeteryAdminSummaryIconText}>🪦</Text>
+                <Image source={CEMETERY_GRAVE_ICON} style={styles.cemeteryAdminSummaryIconText} resizeMode="contain" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cemeteryAdminSummaryLabel}>
@@ -6268,6 +6229,43 @@ export default function AdminScreen() {
                   {filteredCemeteryRecords.length} matching current search
                 </Text>
               </View>
+            </View>
+
+            <View style={{ marginBottom: 14 }}>
+              <Text style={styles.formTitle}>Cemetery Register</Text>
+              <Text style={styles.sectionDescription}>Select a register to view its records.</Text>
+              {CEMETERY_REGISTER_CATEGORIES.map((category) => {
+                const count = cemeteryRecords.filter((item) => item.row_name === category).length;
+                const active = cemeteryRowName === category;
+                const categoryRecords = filteredCemeteryRecords.filter((item) => item.row_name === category);
+                return (
+                  <View key={category} style={[styles.cemeteryCard, active && { borderColor: RED, borderWidth: 2 }]}>
+                    <Pressable onPress={() => setCemeteryRowName(category)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <View style={[styles.cemeteryAdminSummaryIcon, active && { backgroundColor: RED }]}><Image source={CEMETERY_GRAVE_ICON} style={styles.cemeteryAdminSummaryIconText} resizeMode="contain" /></View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cemeteryCardName}>{category}</Text>
+                        <Text style={styles.cemeteryCardMeta}>{count} record{count === 1 ? '' : 's'}</Text>
+                      </View>
+                      <Text style={{ fontWeight: '900', color: active ? RED : MUTED }}>{active ? 'SELECTED' : 'OPEN'}</Text>
+                    </Pressable>
+                    {active ? (
+                      <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 10 }}>
+                        {categoryRecords.length === 0 ? <Text style={styles.emptyText}>No record in {category}.</Text> : categoryRecords.map((item) => (
+                          <View key={item.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+                            <Text style={styles.cemeteryCardName}>{item.deceased_name}</Text>
+                            <Text style={styles.cemeteryCardMeta}>Grave: {item.grave_number || '-'} • {item.is_published ? 'PUBLIC' : 'HIDDEN'}</Text>
+                            <View style={styles.actionRow}>
+                              <Pressable onPress={() => editCemetery(item)} style={styles.actionButton}><Text style={styles.actionText}>EDIT</Text></Pressable>
+                              <Pressable onPress={() => toggleCemetery(item)} style={styles.actionButton}><Text style={styles.actionText}>{item.is_published ? 'HIDE' : 'PUBLISH'}</Text></Pressable>
+                              <Pressable onPress={() => deleteCemetery(item)} style={[styles.actionButton, styles.deleteAction]}><Text style={[styles.actionText, styles.deleteActionText]}>DELETE</Text></Pressable>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
 
             <View style={styles.formCard}>
@@ -6284,88 +6282,128 @@ export default function AdminScreen() {
                 style={styles.input}
               />
 
-              <Text style={styles.label}>Date of Birth</Text>
+              <Pressable onPress={pickCemeteryPersonPhoto} style={styles.outlineButton} disabled={cemeteryPhotoUploading || savingCemetery}>
+                <Text style={styles.outlineButtonText}>{cemeteryPhoto ? 'CHANGE PHOTO' : 'ADD PHOTO'}</Text>
+              </Pressable>
+              {cemeteryPhoto ? (
+                <View style={{ gap: 8 }}>
+                  <Image source={{ uri: cemeteryPhoto }} style={styles.cemeteryFormImage} />
+                  <Pressable onPress={() => setCemeteryPhoto('')} style={styles.outlineButton}>
+                    <Text style={styles.outlineButtonText}>REMOVE PHOTO</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              <Text style={styles.label}>Date of Birth (Optional)</Text>
               <TextInput
                 value={cemeteryDateOfBirth}
                 onChangeText={setCemeteryDateOfBirth}
-                placeholder="DD/MM/YYYY"
+                placeholder="DD/MM/YYYY or YYYY"
                 placeholderTextColor="#999999"
                 style={styles.input}
+                keyboardType="numbers-and-punctuation"
               />
 
-              <Text style={styles.label}>Date of Death</Text>
+              <Text style={styles.label}>Date of Death (Optional)</Text>
               <TextInput
                 value={cemeteryDateOfDeath}
                 onChangeText={setCemeteryDateOfDeath}
-                placeholder="DD/MM/YYYY"
+                placeholder="DD/MM/YYYY or YYYY"
                 placeholderTextColor="#999999"
                 style={styles.input}
               />
 
-              <Text style={styles.label}>Burial Date</Text>
-              <TextInput
-                value={cemeteryBurialDate}
-                onChangeText={setCemeteryBurialDate}
-                placeholder="DD/MM/YYYY"
-                placeholderTextColor="#999999"
-                style={styles.input}
-              />
+              <Text style={styles.label}>Mitthi Kum Zat (Manual)</Text>
+              <TextInput value={cemeteryAgeAtDeath} onChangeText={setCemeteryAgeAtDeath} placeholder="e.g. 72" placeholderTextColor="#999999" style={styles.input} keyboardType="number-pad" />
 
-              <Text style={styles.label}>Cemetery</Text>
-              <TextInput
-                value={cemeteryName}
-                onChangeText={setCemeteryName}
-                placeholder="Salem Cemetery"
-                placeholderTextColor="#999999"
-                style={styles.input}
-              />
-
-              <View style={styles.twoColumnRow}>
-                <View style={styles.twoColumnItem}>
-                  <Text style={styles.label}>Section</Text>
-                  <TextInput
-                    value={cemeterySection}
-                    onChangeText={setCemeterySection}
-                    placeholder="A"
-                    placeholderTextColor="#999999"
-                    style={styles.input}
-                  />
-                </View>
-                <View style={styles.twoColumnItem}>
-                  <Text style={styles.label}>Row</Text>
-                  <TextInput
-                    value={cemeteryRowName}
-                    onChangeText={setCemeteryRowName}
-                    placeholder="1"
-                    placeholderTextColor="#999999"
-                    style={styles.input}
-                  />
-                </View>
+              <Text style={styles.label}>Register Category *</Text>
+              <View style={styles.statusRow}>
+                {CEMETERY_REGISTER_CATEGORIES.map((category) => (
+                  <Pressable key={category} onPress={() => setCemeteryRowName(category)} style={[styles.statusButton, cemeteryRowName === category && styles.statusButtonActive]}>
+                    <Text style={[styles.statusButtonText, cemeteryRowName === category && styles.statusButtonTextActive]}>{category}</Text>
+                  </Pressable>
+                ))}
               </View>
 
-              <Text style={styles.label}>Grave Number</Text>
-              <TextInput
-                value={cemeteryGraveNumber}
-                onChangeText={setCemeteryGraveNumber}
-                placeholder="A-01"
-                placeholderTextColor="#999999"
-                style={styles.input}
-              />
+
+              <Text style={styles.label}>Cemetery</Text>
+              <TextInput value="Salem Thlanmual" editable={false} style={[styles.input, { opacity: 0.7 }]} />
+
+              <Text style={styles.label}>Grave No.</Text>
+              {!editingCemeteryId ? (
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <Pressable
+                    onPress={() => {
+                      setCemeteryAddToExistingGrave(false);
+                      setCemeteryGraveNumber('');
+                    }}
+                    style={[styles.statusButton, !cemeteryAddToExistingGrave && styles.statusButtonActive]}
+                  >
+                    <Text style={[styles.statusButtonText, !cemeteryAddToExistingGrave && styles.statusButtonTextActive]}>NEW GRAVE</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setCemeteryAddToExistingGrave(true)}
+                    style={[styles.statusButton, cemeteryAddToExistingGrave && styles.statusButtonActive]}
+                  >
+                    <Text style={[styles.statusButtonText, cemeteryAddToExistingGrave && styles.statusButtonTextActive]}>ADD TO EXISTING GRAVE</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {editingCemeteryId ? (
+                <TextInput
+                  value={cemeteryGraveNumber}
+                  editable={false}
+                  style={[styles.input, { opacity: 0.7 }]}
+                />
+              ) : cemeteryAddToExistingGrave ? (
+                <View style={{ gap: 8, marginBottom: 10 }}>
+                  {Array.from(new Set(
+                    cemeteryRecords
+                      .filter((item) => item.cemetery_name === (cemeteryName.trim() || 'Salem Cemetery') && item.row_name === cemeteryRowName && item.grave_number)
+                      .map((item) => String(item.grave_number))
+                  )).sort().map((grave) => {
+                    const people = cemeteryRecords.filter(
+                      (item) => item.cemetery_name === (cemeteryName.trim() || 'Salem Cemetery') && item.row_name === cemeteryRowName && item.grave_number === grave
+                    ).length;
+                    const selected = cemeteryGraveNumber === grave;
+                    return (
+                      <Pressable
+                        key={grave}
+                        onPress={() => setCemeteryGraveNumber(grave)}
+                        style={[styles.statusButton, selected && styles.statusButtonActive]}
+                      >
+                        <Text style={[styles.statusButtonText, selected && styles.statusButtonTextActive]}>
+                          {grave} • {people} {people === 1 ? 'person' : 'persons'}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  {Array.from(new Set(cemeteryRecords.filter((item) => item.row_name === cemeteryRowName && item.grave_number).map((item) => String(item.grave_number)))).length === 0 ? (
+                    <Text style={{ color: '#737A84', fontSize: 12 }}>No existing grave in this register yet.</Text>
+                  ) : null}
+                </View>
+              ) : (
+                <TextInput
+                  value={cemeteryRowName ? `Next: ${getCemeteryGravePrefix(cemeteryRowName)}-XX` : ''}
+                  editable={false}
+                  placeholder="Select a register category"
+                  placeholderTextColor="#999999"
+                  style={[styles.input, { opacity: 0.7 }]}
+                />
+              )}
+
+              {!editingCemeteryId && cemeteryRowName && !cemeteryAddToExistingGrave ? (
+                <Text style={{ color: '#737A84', fontSize: 12, marginTop: -6, marginBottom: 10 }}>
+                  New registration will automatically receive the next available grave number. If this person shares a grave, choose “ADD TO EXISTING GRAVE” instead.
+                </Text>
+              ) : null}
 
               <Text style={styles.label}>Family Name</Text>
               <TextInput
                 value={cemeteryFamilyName}
                 onChangeText={setCemeteryFamilyName}
                 placeholder="Family / clan name"
-                placeholderTextColor="#999999"
-                style={styles.input}
-              />
-
-              <Text style={styles.label}>Family Contact Name</Text>
-              <TextInput
-                value={cemeteryFamilyContactName}
-                onChangeText={setCemeteryFamilyContactName}
-                placeholder="Optional internal contact"
                 placeholderTextColor="#999999"
                 style={styles.input}
               />
@@ -6414,69 +6452,6 @@ export default function AdminScreen() {
                 </View>
               ) : null}
 
-              <Pressable
-                onPress={pickCemeteryDocument}
-                style={styles.outlineButton}
-                disabled={cemeteryDocumentUploading || savingCemetery}
-              >
-                <Text style={styles.outlineButtonText}>
-                  {cemeteryDocumentUploading
-                    ? 'UPLOADING DOCUMENT...'
-                    : cemeteryDocumentUrl
-                      ? 'CHANGE OLD RECORD PDF'
-                      : 'ADD OLD RECORD PDF'}
-                </Text>
-              </Pressable>
-
-              {cemeteryDocumentUrl ? (
-                <View style={styles.zonunPdfReady}>
-                  <Text style={styles.zonunPdfReadyIcon}>📄</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.zonunPdfReadyTitle}>
-                      Old record PDF ready
-                    </Text>
-                    <Text style={styles.zonunPdfReadyText}>
-                      This document can be opened from the public record.
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
-
-              <View style={styles.twoColumnRow}>
-                <View style={styles.twoColumnItem}>
-                  <Text style={styles.label}>Latitude</Text>
-                  <TextInput
-                    value={cemeteryLatitude}
-                    onChangeText={setCemeteryLatitude}
-                    placeholder="23.7271"
-                    placeholderTextColor="#999999"
-                    style={styles.input}
-                    keyboardType="numbers-and-punctuation"
-                  />
-                </View>
-                <View style={styles.twoColumnItem}>
-                  <Text style={styles.label}>Longitude</Text>
-                  <TextInput
-                    value={cemeteryLongitude}
-                    onChangeText={setCemeteryLongitude}
-                    placeholder="92.7176"
-                    placeholderTextColor="#999999"
-                    style={styles.input}
-                    keyboardType="numbers-and-punctuation"
-                  />
-                </View>
-              </View>
-
-              <Text style={styles.label}>Admin Notes</Text>
-              <TextInput
-                value={cemeteryNotes}
-                onChangeText={setCemeteryNotes}
-                placeholder="Private/internal notes"
-                placeholderTextColor="#999999"
-                style={[styles.input, styles.textAreaSmall]}
-                multiline
-                textAlignVertical="top"
-              />
 
               <Text style={styles.label}>Public Visibility</Text>
               <View style={styles.statusRow}>
@@ -6504,6 +6479,13 @@ export default function AdminScreen() {
                 ))}
               </View>
 
+              {cemeterySaveError ? (
+                <View style={{ marginBottom: 12, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#D32F2F', backgroundColor: '#FFF5F5' }}>
+                  <Text style={{ color: '#B71C1C', fontWeight: '800', fontSize: 13 }}>SAVE FAILED</Text>
+                  <Text style={{ color: '#B71C1C', marginTop: 4, lineHeight: 19 }}>{cemeterySaveError}</Text>
+                </View>
+              ) : null}
+
               <Pressable
                 onPress={saveCemetery}
                 style={styles.primaryButton}
@@ -6522,7 +6504,7 @@ export default function AdminScreen() {
             <TextInput
               value={cemeterySearch}
               onChangeText={setCemeterySearch}
-              placeholder="Search name, family, grave, section..."
+              placeholder="Search name, family, grave, category..."
               placeholderTextColor="#999999"
               style={styles.input}
             />
@@ -6531,7 +6513,7 @@ export default function AdminScreen() {
               <View>
                 <Text style={styles.sectionTitle}>Cemetery Register</Text>
                 <Text style={styles.sectionDescription}>
-                  Family contacts and admin notes are kept in the admin record.
+                  Register 5-te record-te separate-a manage rawh.
                 </Text>
               </View>
               <View style={styles.zonunCountBadge}>
@@ -6559,7 +6541,7 @@ export default function AdminScreen() {
                       />
                     ) : (
                       <View style={styles.cemeteryThumbPlaceholder}>
-                        <Text style={styles.cemeteryThumbIcon}>🪦</Text>
+                        <Image source={CEMETERY_GRAVE_ICON} style={styles.cemeteryThumbIcon} resizeMode="contain" />
                       </View>
                     )}
 
@@ -6577,8 +6559,7 @@ export default function AdminScreen() {
                       </Text>
                       <Text style={styles.cemeteryCardMeta}>
                         Grave: {item.grave_number || '-'}
-                        {item.section ? ` • Section ${item.section}` : ''}
-                        {item.row_name ? ` • Row ${item.row_name}` : ''}
+                        {item.row_name ? ` • ${item.row_name}` : ''}
                       </Text>
                     </View>
 
@@ -7310,7 +7291,8 @@ const styles = StyleSheet.create({
   },
 
   cemeteryOnlyIcon: {
-    fontSize: 25,
+    width: 28,
+    height: 28,
     marginRight: 12,
   },
 
@@ -8442,7 +8424,8 @@ const styles = StyleSheet.create({
   },
 
   cemeteryStatIconText: {
-    fontSize: 20,
+    width: 24,
+    height: 24,
   },
 
   cemeteryAdminSummary: {
@@ -8466,7 +8449,8 @@ const styles = StyleSheet.create({
   },
 
   cemeteryAdminSummaryIconText: {
-    fontSize: 25,
+    width: 30,
+    height: 30,
   },
 
   cemeteryAdminSummaryLabel: {
@@ -8551,7 +8535,8 @@ const styles = StyleSheet.create({
   },
 
   cemeteryThumbIcon: {
-    fontSize: 24,
+    width: 32,
+    height: 32,
   },
 
   cemeteryCardInfo: {

@@ -449,8 +449,12 @@ export default function ChhiatniAdminScreen() {
   async function deleteBill(bill: Bill) {
     if (!(await confirmWeb('Delete family bill?', `Permanently delete the ${bill.bill_month || ''} bill for House No. ${bill.house_number || '-'}?`))) return;
     try {
-      const { error } = await supabase.from('chhiatni_fund_bills').delete().eq('id', bill.id);
+      const { data, error } = await supabase.rpc('admin_delete_record', {
+        p_table_name: 'chhiatni_fund_bills',
+        p_record_id: String(bill.id),
+      });
       if (error) throw error;
+      if (data !== true) throw new Error('The database did not confirm deletion.');
       await load();
     } catch (error: any) {
       Alert.alert('Delete failed', error?.message || 'Unable to delete family bill.');
