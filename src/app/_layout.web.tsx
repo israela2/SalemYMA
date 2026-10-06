@@ -21,10 +21,13 @@ function WebNavItem({
       accessibilityRole="link"
       onPress={() => router.push(href as never)}
       style={({ hovered, pressed }) => ({
-        flex: 1,
-        minWidth: 72,
-        maxWidth: 118,
-        height: 56,
+        flexGrow: 1,
+        flexShrink: 1,
+        flexBasis: 0,
+        width: '20%',
+        minWidth: 0,
+        maxWidth: '20%',
+        height: 58,
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
@@ -38,8 +41,8 @@ function WebNavItem({
     >
       <Text
         style={{
-          fontSize: 19,
-          lineHeight: 22,
+          fontSize: 18,
+          lineHeight: 21,
           color: active ? '#C62828' : '#777777',
           fontWeight: '900',
         }}
@@ -48,9 +51,9 @@ function WebNavItem({
       </Text>
       <Text
         style={{
-          marginTop: 3,
-          fontSize: 11,
-          lineHeight: 13,
+          marginTop: 2,
+          fontSize: 10,
+          lineHeight: 12,
           color: active ? '#C62828' : '#666666',
           fontWeight: '800',
         }}
@@ -228,31 +231,40 @@ export default function WebRootLayout() {
         backgroundColor: '#F7F7F7',
       }}
     >
-      <View style={{ flex: 1, minHeight: 0 }}>
+      <View style={{ flex: 1, minHeight: 0, paddingBottom: 88 }}>
         <Slot />
       </View>
 
       <View
         style={{
-          minHeight: 82,
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 99999,
+          elevation: 99999,
+          width: '100%',
+          height: 76,
+          minHeight: 76,
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E5E5E5',
-          paddingHorizontal: 18,
-          paddingTop: 10,
-          paddingBottom: 10,
-          alignItems: 'center',
+          paddingHorizontal: 0,
+          paddingTop: 6,
+          paddingBottom: 6,
+          alignItems: 'stretch',
           boxShadow: '0 -4px 16px rgba(0,0,0,0.08)',
         } as any}
       >
         <View
           style={{
             width: '100%',
-            maxWidth: 620,
+            maxWidth: 'none',
+            flex: 1,
             flexDirection: 'row',
-            alignItems: 'center',
+            alignItems: 'stretch',
             justifyContent: 'space-between',
-            gap: 8,
+            gap: 0,
           }}
         >
           <WebNavItem label="Home" icon="⌂" href="/" active={isActive('/')} />

@@ -371,18 +371,20 @@ export default function CemeteryScreen() {
     <View style={styles.container}>
       <LinearGradient colors={[BLACK, RED_DARK]} style={styles.header}>
         <View style={styles.headerInner}>
-          <View style={styles.headerLeft}>
-            <AppBackButton />
-            <Image source={require('../assets/yma-logo.png')} style={styles.headerLogo} resizeMode="contain" />
-            <View style={styles.headerTextWrap}>
-              <Text style={styles.headerEyebrow}>YMA Salem Branch</Text>
-              <Text style={styles.headerTitle}>Thlanmual Record</Text>
-              <Text style={styles.headerSubtitle}>Cemetery Records</Text>
+          <View style={styles.headerTopRow}>
+            <View style={styles.headerBrandRow}>
+              <AppBackButton />
+              <Image source={require('../assets/yma-logo.png')} style={styles.headerLogo} resizeMode="contain" />
+            </View>
+            <View style={styles.totalRecordsPill}>
+              <Text style={styles.totalRecordsLabel}>Total Records</Text>
+              <Text style={styles.totalRecordsValue}>{records.length}</Text>
             </View>
           </View>
-          <View style={styles.totalRecordsPill}>
-            <Text style={styles.totalRecordsLabel}>Total Records</Text>
-            <Text style={styles.totalRecordsValue}>{records.length}</Text>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.headerEyebrow}>YMA Salem Branch</Text>
+            <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>Thlanmual Record</Text>
+            <Text style={styles.headerSubtitle}>Cemetery Records</Text>
           </View>
         </View>
       </LinearGradient>
@@ -586,9 +588,9 @@ const styles = StyleSheet.create({
   loadingSubtitle: { color: '#D9D9D9', fontSize: 13, fontWeight: '600', marginTop: 7 },
   loadingSpinner: { marginTop: 20 },
 
-  totalRecordsPill: { minWidth: 132, minHeight: 52, paddingHorizontal: 15, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
+  totalRecordsPill: { minWidth: 112, minHeight: 50, paddingHorizontal: 13, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
   totalRecordsLabel: { color: '#DCE5EF', fontSize: 10, fontWeight: '700', letterSpacing: 0.2 },
-  totalRecordsValue: { color: WHITE, fontSize: 22, fontWeight: '900', marginTop: 1 },
+  totalRecordsValue: { color: WHITE, fontSize: 21, fontWeight: '900', marginTop: 1 },
 
   header: {
     paddingTop: Platform.OS === 'web' ? 18 : 58,
@@ -599,16 +601,20 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 1000,
     alignSelf: 'center',
+  },
+  headerTopRow: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
-  headerLogo: { width: 50, height: 50, marginRight: 12 },
-  headerTextWrap: { flex: 1, minWidth: 0 },
+  headerBrandRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+  headerLogo: { width: 50, height: 50, marginLeft: 10 },
+  headerTextWrap: { width: '100%', minWidth: 0 },
   headerEyebrow: { color: '#FFDADA', fontSize: 10, fontWeight: '900', letterSpacing: 1.8, marginBottom: 3 },
-  headerTitle: { color: WHITE, fontSize: 24, fontWeight: '900', lineHeight: 28 },
-  headerSubtitle: { color: '#E7E7E7', fontSize: 12, fontWeight: '600', marginTop: 3 },
+  headerTitle: { color: WHITE, fontSize: 28, fontWeight: '900', lineHeight: 33, letterSpacing: -0.4 },
+  headerSubtitle: { color: '#E7E7E7', fontSize: 13, fontWeight: '600', marginTop: 4 },
 
   body: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 30 },
@@ -646,17 +652,17 @@ const styles = StyleSheet.create({
   recordSelectorIcon: { width: 46, height: 46, borderRadius: 13, backgroundColor: '#EEF4FA', borderWidth: 1, borderColor: '#DDE8F2', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   recordSelectorIconText: { color: '#2E5D8A', fontSize: 23, fontWeight: '900' },
   recordCountPill: { minWidth: 44, height: 30, paddingHorizontal: 10, borderRadius: 15, backgroundColor: '#EDF3FB', color: '#2E5D8A', textAlign: 'center', textAlignVertical: 'center', fontSize: 12, fontWeight: '900' },
-  rowSelectorRowCompact: { flexDirection: 'row', gap: 10 },
-  rowSelectorButtonCompact: { flex: 1, minHeight: 70, borderRadius: 14, borderWidth: 1, borderColor: BORDER, backgroundColor: SOFT, padding: 10, flexDirection: 'row', alignItems: 'center' },
-  rowSelectorButtonCompactActive: { backgroundColor: '#EAF2FB', borderColor: '#8DB4DA' },
-  rowSelectorBadgeCompact: { width: 40, height: 40, borderRadius: 20, backgroundColor: WHITE, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', marginRight: 9 },
+  rowSelectorRowCompact: { flexDirection: 'row', width: '100%', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4 },
+  rowSelectorButtonCompact: { flex: 1, minWidth: 0, minHeight: 96, borderRadius: 14, paddingVertical: 5, paddingHorizontal: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' },
+  rowSelectorButtonCompactActive: { backgroundColor: 'transparent' },
+  rowSelectorBadgeCompact: { width: 46, height: 46, borderRadius: 23, backgroundColor: WHITE, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', marginRight: 0, marginBottom: 5 },
   rowSelectorBadgeCompactActive: { backgroundColor: '#2E5D8A', borderColor: '#2E5D8A' },
   rowSelectorGraveIcon: { width: 24, height: 24 },
   rowSelectorBadgeTextCompact: { color: TEXT, fontSize: 15, fontWeight: '900' },
   rowSelectorBadgeTextCompactActive: { color: WHITE },
-  rowSelectorLabelCompact: { color: TEXT, fontSize: 13, fontWeight: '900' },
+  rowSelectorLabelCompact: { color: TEXT, fontSize: 9, lineHeight: 11, fontWeight: '900', textAlign: 'center', width: '100%' },
   rowSelectorLabelCompactActive: { color: '#244C72' },
-  rowSelectorCountCompact: { color: MUTED, fontSize: 9, fontWeight: '700', marginTop: 2 },
+  rowSelectorCountCompact: { color: MUTED, fontSize: 7.5, lineHeight: 10, fontWeight: '700', marginTop: 1, textAlign: 'center' },
   rowSelectorCountCompactActive: { color: '#2E5D8A' },
   resultsPanel: { backgroundColor: WHITE, borderRadius: 18, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginBottom: 14 },
   resultsPanelHeader: { minHeight: 74, paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: BORDER },

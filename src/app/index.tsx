@@ -357,6 +357,26 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
 
+          {/* Cemetery Record */}
+          <Pressable
+            style={styles.quickCard}
+            onPress={() => router.push('/cemetery')}
+          >
+            <View style={[styles.quickIcon, styles.redIcon]}>
+              <Text style={styles.quickIconText}>
+                ⚰️
+              </Text>
+            </View>
+
+            <Text style={styles.quickTitle}>
+              Thlanmual Record
+            </Text>
+
+            <Text style={styles.quickSubtitle}>
+              Cemetery records
+            </Text>
+          </Pressable>
+
         </View>
 
         {/* Latest News */}
