@@ -371,20 +371,18 @@ export default function CemeteryScreen() {
     <View style={styles.container}>
       <LinearGradient colors={[BLACK, RED_DARK]} style={styles.header}>
         <View style={styles.headerInner}>
-          <View style={styles.headerTopRow}>
-            <View style={styles.headerBrandRow}>
-              <AppBackButton />
-              <Image source={require('../assets/yma-logo.png')} style={styles.headerLogo} resizeMode="contain" />
-            </View>
-            <View style={styles.totalRecordsPill}>
-              <Text style={styles.totalRecordsLabel}>Total Records</Text>
-              <Text style={styles.totalRecordsValue}>{records.length}</Text>
+          <View style={styles.headerLeft}>
+            <AppBackButton />
+            <Image source={require('../assets/yma-logo.png')} style={styles.headerLogo} resizeMode="contain" />
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.headerEyebrow}>YMA Salem Branch</Text>
+              <Text style={styles.headerTitle}>Thlanmual Record</Text>
+              <Text style={styles.headerSubtitle}>Cemetery Records</Text>
             </View>
           </View>
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.headerEyebrow}>YMA Salem Branch</Text>
-            <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>Thlanmual Record</Text>
-            <Text style={styles.headerSubtitle}>Cemetery Records</Text>
+          <View style={styles.totalRecordsPill}>
+            <Text style={styles.totalRecordsLabel}>Total Records</Text>
+            <Text style={styles.totalRecordsValue}>{records.length}</Text>
           </View>
         </View>
       </LinearGradient>
@@ -424,6 +422,29 @@ export default function CemeteryScreen() {
           <View style={styles.aerialPhotoCard}>
             <View style={styles.aerialPhotoFrame}>
               <Image source={require('../assets/thlanmual-row-map.png')} style={styles.aerialPhoto} resizeMode="cover" />
+              {selectedCategory === 'Row A' || selectedCategory === 'Row B' || selectedCategory === 'Row C' ? (
+                <View pointerEvents="none" style={styles.aerialBlurLayer}>
+                  {([
+                    { row: 'Row A' as const, clipPath: 'polygon(0% 0%, 22.55% 0%, 28.12% 100%, 0% 100%)' },
+                    { row: 'Row B' as const, clipPath: 'polygon(22.55% 0%, 43.00% 0%, 51.02% 100%, 28.12% 100%)' },
+                    { row: 'Row C' as const, clipPath: 'polygon(43.00% 0%, 100% 0%, 100% 100%, 51.02% 100%)' },
+                  ]).map(({ row, clipPath }) => {
+                    const selected = selectedCategory === row;
+                    return !selected ? (
+                      <View
+                        key={row}
+                        style={[styles.aerialBlurRegion, { clipPath } as any]}
+                      >
+                        <Image
+                          source={require('../assets/thlanmual-row-map.png')}
+                          resizeMode="cover"
+                          style={[styles.aerialPhoto, styles.aerialBlurredPhoto]}
+                        />
+                      </View>
+                    ) : null;
+                  })}
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -588,9 +609,9 @@ const styles = StyleSheet.create({
   loadingSubtitle: { color: '#D9D9D9', fontSize: 13, fontWeight: '600', marginTop: 7 },
   loadingSpinner: { marginTop: 20 },
 
-  totalRecordsPill: { minWidth: 112, minHeight: 50, paddingHorizontal: 13, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
+  totalRecordsPill: { minWidth: 132, minHeight: 52, paddingHorizontal: 15, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
   totalRecordsLabel: { color: '#DCE5EF', fontSize: 10, fontWeight: '700', letterSpacing: 0.2 },
-  totalRecordsValue: { color: WHITE, fontSize: 21, fontWeight: '900', marginTop: 1 },
+  totalRecordsValue: { color: WHITE, fontSize: 22, fontWeight: '900', marginTop: 1 },
 
   header: {
     paddingTop: Platform.OS === 'web' ? 18 : 58,
@@ -601,20 +622,16 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 1000,
     alignSelf: 'center',
-  },
-  headerTopRow: {
-    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
   },
-  headerBrandRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
-  headerLogo: { width: 50, height: 50, marginLeft: 10 },
-  headerTextWrap: { width: '100%', minWidth: 0 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
+  headerLogo: { width: 50, height: 50, marginRight: 12 },
+  headerTextWrap: { flex: 1, minWidth: 0 },
   headerEyebrow: { color: '#FFDADA', fontSize: 10, fontWeight: '900', letterSpacing: 1.8, marginBottom: 3 },
-  headerTitle: { color: WHITE, fontSize: 28, fontWeight: '900', lineHeight: 33, letterSpacing: -0.4 },
-  headerSubtitle: { color: '#E7E7E7', fontSize: 13, fontWeight: '600', marginTop: 4 },
+  headerTitle: { color: WHITE, fontSize: 24, fontWeight: '900', lineHeight: 28 },
+  headerSubtitle: { color: '#E7E7E7', fontSize: 12, fontWeight: '600', marginTop: 3 },
 
   body: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 30 },
@@ -645,8 +662,11 @@ const styles = StyleSheet.create({
   reloadSquareText: { color: TEXT, fontSize: 25, fontWeight: '700', lineHeight: 28 },
   yearChipRowCompact: { gap: 8, paddingBottom: 12 },
   aerialPhotoCard: { backgroundColor: WHITE, borderRadius: 18, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginBottom: 14 },
-  aerialPhotoFrame: { width: '100%', aspectRatio: 1664 / 936, backgroundColor: '#E8ECEB' },
+  aerialPhotoFrame: { width: '100%', aspectRatio: 1672 / 941, backgroundColor: '#E8ECEB', position: 'relative', overflow: 'hidden' },
   aerialPhoto: { width: '100%', height: '100%' },
+  aerialBlurLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
+  aerialBlurRegion: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
+  aerialBlurredPhoto: ({ filter: 'blur(9px)', transform: [{ scale: 1.025 }] } as any),
   recordSelectorCard: { backgroundColor: WHITE, borderRadius: 18, borderWidth: 1, borderColor: BORDER, padding: 16, marginBottom: 14, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
   recordSelectorHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   recordSelectorIcon: { width: 46, height: 46, borderRadius: 13, backgroundColor: '#EEF4FA', borderWidth: 1, borderColor: '#DDE8F2', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
