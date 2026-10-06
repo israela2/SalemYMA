@@ -121,7 +121,7 @@ export default function LoginScreen() {
           email: cleanEmail,
           section: section,
           house_number: cleanHouseNumber,
-          branch_name: 'Salem YMA Branch',
+          branch_name: 'YMA Salem Branch',
           status: 'Active',
         });
 
@@ -191,14 +191,14 @@ export default function LoginScreen() {
           style={styles.hero}
         >
           <Image
-            source={require('../../assets/images/yma-logo.png')}
+            source={require('../assets/yma-logo.png')}
             style={styles.backgroundLogo}
             resizeMode="contain"
           />
 
           <View style={styles.heroContent}>
             <Text style={styles.brand}>
-              YMA SALEM BRANCH
+              YMA Salem Branch
             </Text>
 
             <Text style={styles.heroSubtitle}>
@@ -209,8 +209,8 @@ export default function LoginScreen() {
 
             <Text style={styles.heroMessage}>
               {isRegister
-                ? 'Join the Salem YMA community'
-                : 'Welcome back to Salem YMA'}
+                ? 'Join the YMA Salem Branch community'
+                : 'Welcome back to YMA Salem Branch'}
             </Text>
           </View>
         </LinearGradient>
@@ -229,8 +229,8 @@ export default function LoginScreen() {
 
             <Text style={styles.formSubtitle}>
               {isRegister
-                ? 'Create your Salem YMA member account'
-                : 'Login to access your Salem YMA account'}
+                ? 'Create your YMA Salem Branch member account'
+                : 'Login to access your YMA Salem Branch account'}
             </Text>
           </View>
 
@@ -559,7 +559,7 @@ export default function LoginScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerTitle}>
-            YMA SALEM BRANCH
+            YMA Salem Branch
           </Text>
 
           <Text style={styles.footerText}>
@@ -575,7 +575,7 @@ export default function LoginScreen() {
           </Text>
 
           <Text style={styles.footerSmall}>
-            YMA SALEM BRANCH Mobile Application
+            YMA Salem Branch Mobile Application
           </Text>
         </View>
       </ScrollView>

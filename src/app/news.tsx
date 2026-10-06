@@ -1,5 +1,4 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 type NewsItem = {
   id: number;
   title: string | null;
@@ -81,15 +81,10 @@ export default function NewsScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
-          <Pressable
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backButtonText}>‹ Back</Text>
-          </Pressable>
+          <AppBackButton />
 
           <Text style={styles.headerSmall}>
-            YMA SALEM BRANCH
+            YMA Salem Branch
           </Text>
 
           <Text style={styles.headerTitle}>
@@ -97,7 +92,7 @@ export default function NewsScreen() {
           </Text>
 
           <Text style={styles.headerText}>
-            Salem YMA latest news and updates
+            YMA Salem Branch latest news and updates
           </Text>
         </LinearGradient>
 
@@ -149,7 +144,7 @@ export default function NewsScreen() {
             </Text>
 
             <Text style={styles.messageText}>
-              Salem YMA news and announcements
+              YMA Salem Branch news and announcements
               will appear here.
             </Text>
 
@@ -272,7 +267,7 @@ export default function NewsScreen() {
               </Pressable>
 
               <Text style={styles.modalSmall}>
-                SALEM YMA
+                YMA Salem Branch
               </Text>
 
               <Text style={styles.modalTitle}>

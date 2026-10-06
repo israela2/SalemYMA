@@ -15,6 +15,7 @@ import {
 
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 type AdminRole = 'full_admin' | 'cemetery_admin';
 
 export default function AdminSignUpScreen() {
@@ -82,10 +83,8 @@ export default function AdminSignUpScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient colors={['#C62828', '#0B0B0B']} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <Text style={styles.eyebrow}>SALEM YMA</Text>
+        <AppBackButton />
+        <Text style={styles.eyebrow}>YMA Salem Branch</Text>
         <Text style={styles.title}>Admin Sign Up</Text>
         <Text style={styles.subtitle}>Request administrator access</Text>
       </LinearGradient>

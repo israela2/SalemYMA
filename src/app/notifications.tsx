@@ -8,12 +8,12 @@ import {
 } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import { clearAllNotifications, hideNotification, loadNotifications, registerForNotifications, type AppNotification } from '../lib/notification-service';
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 export default function NotificationsScreen() {
   const [items, setItems] = useState<AppNotification[]>([]);
 
@@ -66,18 +66,11 @@ export default function NotificationsScreen() {
         style={styles.header}
       >
         <View style={styles.headerTop}>
-          <Pressable
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backIcon}>
-              ‹
-            </Text>
-          </Pressable>
+          <AppBackButton />
 
           <View style={styles.headerLogoBox}>
             <Image
-              source={require('../../assets/images/yma-logo.png')}
+              source={require('../assets/yma-logo.png')}
               style={styles.headerLogo}
               resizeMode="contain"
             />
@@ -87,7 +80,7 @@ export default function NotificationsScreen() {
         <View style={styles.headerTitleRow}>
           <View>
             <Text style={styles.headerEyebrow}>
-              YMA SALEM BRANCH
+              YMA Salem Branch
             </Text>
 
             <Text style={styles.headerTitle}>
@@ -123,7 +116,7 @@ export default function NotificationsScreen() {
           </Text>
 
           <Text style={styles.sectionSubtitle}>
-            Stay informed with Salem YMA
+            Stay informed with YMA Salem Branch
           </Text>
         </View>
 
@@ -175,7 +168,7 @@ export default function NotificationsScreen() {
           </Text>
 
           <Text style={styles.futureText}>
-            New Salem YMA notifications will appear
+            New YMA Salem Branch notifications will appear
             here when available.
           </Text>
         </View>
@@ -196,7 +189,7 @@ export default function NotificationsScreen() {
 
         <View style={styles.infoContent}>
           <Text style={styles.infoEyebrow}>
-            SALEM YMA
+            YMA Salem Branch
           </Text>
 
           <Text style={styles.infoTitle}>
@@ -215,7 +208,7 @@ export default function NotificationsScreen() {
         <View style={styles.footerLine} />
 
         <Text style={styles.footerTitle}>
-          YMA SALEM BRANCH
+          YMA Salem Branch
         </Text>
 
         <Text style={styles.footerText}>

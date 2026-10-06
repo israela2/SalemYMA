@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react';
 
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 type ZonunItem = {
   id: number;
   title: string;
@@ -79,17 +80,12 @@ export default function ZonunScreen() {
 
         <View style={styles.headerRow}>
 
-          <Pressable
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backText}>‹</Text>
-          </Pressable>
+          <AppBackButton />
 
 
           <View style={styles.headerContent}>
             <Text style={styles.small}>
-              SALEM YMA
+              YMA Salem Branch
             </Text>
 
             <Text style={styles.title}>
@@ -151,7 +147,7 @@ export default function ZonunScreen() {
             </Text>
 
             <Text style={styles.introText}>
-              Salem YMA chanchinbu hetah hian chhiar theih a ni.
+              YMA Salem Branch chanchinbu hetah hian chhiar theih a ni.
             </Text>
 
           </View>

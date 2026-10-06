@@ -8,10 +8,10 @@ import {
 } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 export default function AboutScreen() {
   const [memberStats, setMemberStats] = useState({ total: 0, mipa: 0, hmeichhia: 0 });
   const [aboutText, setAboutText] = useState<string>('YMA Salem Branch hi Young Mizo Association hnuaia branch pakhat a ni a. Salem khawtlang chhungah mihring nunphung tha, inpumkhatna, mahni hriatna leh khawtlang tana rawngbawlna te a ngai pawimawh em em a ni.\n\nYMA Salem Branch chuan member-te leh khawtlang tan hmalakna hrang hrang, khawtlang nun siamthatna leh inpumkhatna tihchakna turin a theih ang tawkin hma a la thin.');
@@ -23,7 +23,7 @@ export default function AboutScreen() {
   async function loadAboutData() {
     const [aboutResult, memberResult] = await Promise.all([
       supabase.from('branch_info').select('about_content').eq('id', 1).maybeSingle(),
-      supabase.from('members').select('gender, status, branch_name').eq('branch_name', 'Salem YMA Branch'),
+      supabase.from('members').select('gender, status, branch_name').in('branch_name', ['Salem YMA Branch', 'YMA Salem Branch']),
     ]);
 
     if (aboutResult.data?.about_content) setAboutText(aboutResult.data.about_content);
@@ -52,16 +52,11 @@ export default function AboutScreen() {
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backIcon}>‹</Text>
-        </Pressable>
+        <AppBackButton />
 
         <View style={styles.headerContent}>
           <Text style={styles.headerSmall}>
-            YMA SALEM BRANCH
+            YMA Salem Branch
           </Text>
 
           <Text style={styles.headerTitle}>
@@ -75,7 +70,7 @@ export default function AboutScreen() {
 
         <View style={styles.headerLogoBox}>
           <Image
-            source={require('../../assets/images/yma-logo.png')}
+            source={require('../assets/yma-logo.png')}
             style={styles.headerLogo}
             resizeMode="contain"
           />
@@ -86,14 +81,14 @@ export default function AboutScreen() {
       <View style={styles.logoCard}>
         <View style={styles.logoCircle}>
           <Image
-            source={require('../../assets/images/yma-logo.png')}
+            source={require('../assets/yma-logo.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
         </View>
 
         <Text style={styles.branchTitle}>
-          YMA SALEM BRANCH
+          YMA Salem Branch
         </Text>
 
         <Text style={styles.branchSubtitle}>
@@ -129,7 +124,7 @@ export default function AboutScreen() {
       <View style={styles.statsSection}>
         <Text style={styles.statsEyebrow}>OUR MEMBERS</Text>
         <Text style={styles.statsTitle}>Member Statistics</Text>
-        <Text style={styles.statsSubtitle}>Salem YMA Branch member count</Text>
+        <Text style={styles.statsSubtitle}>YMA Salem Branch member count</Text>
 
         <View style={styles.statsRow}>
           <View style={[styles.statCard, styles.statCardWide]}>
@@ -213,7 +208,7 @@ export default function AboutScreen() {
         <View style={styles.footerLine} />
 
         <Text style={styles.footerTitle}>
-          YMA SALEM BRANCH
+          YMA Salem Branch
         </Text>
 
         <Text style={styles.footerText}>

@@ -114,7 +114,7 @@ export default function MoreScreen() {
         <View style={styles.headerTopRow}>
           <View>
             <Text style={styles.headerSmall}>
-              YMA SALEM BRANCH
+              YMA Salem Branch
             </Text>
 
             <Text style={styles.headerTitle}>
@@ -128,7 +128,7 @@ export default function MoreScreen() {
 
           <View style={styles.headerMark}>
             <Image
-              source={require('../../assets/images/yma-logo.png')}
+              source={require('../assets/yma-logo.png')}
               style={styles.headerLogo}
               resizeMode="contain"
             />
@@ -136,7 +136,7 @@ export default function MoreScreen() {
         </View>
       </LinearGradient>
 
-      {/* YMA SALEM BRANCH / ABOUT US CARD */}
+      {/* YMA Salem Branch / ABOUT US CARD */}
       <Pressable
         style={({ pressed }) => [
           styles.profileCard,
@@ -146,7 +146,7 @@ export default function MoreScreen() {
       >
         <View style={styles.logoContainer}>
           <Image
-            source={require('../../assets/images/yma-logo.png')}
+            source={require('../assets/yma-logo.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
@@ -154,7 +154,7 @@ export default function MoreScreen() {
 
         <View style={styles.profileInfo}>
           <Text style={styles.profileTitle}>
-            YMA SALEM BRANCH
+            YMA Salem Branch
           </Text>
 
           <Text style={styles.profileText}>
@@ -175,12 +175,12 @@ export default function MoreScreen() {
         </View>
       </Pressable>
 
-      {/* Salem YMA */}
+      {/* YMA Salem Branch */}
       <View style={styles.sectionHeaderRow}>
         <View style={styles.sectionDot} />
 
         <Text style={styles.sectionTitle}>
-          Salem YMA
+          YMA Salem Branch
         </Text>
       </View>
 
@@ -204,7 +204,7 @@ export default function MoreScreen() {
           </Text>
 
           <Text style={styles.menuText}>
-            Photos and memories of Salem YMA
+            Photos and memories of YMA Salem Branch
           </Text>
         </View>
 
@@ -353,7 +353,7 @@ export default function MoreScreen() {
               </Text>
 
               <Text style={styles.menuText}>
-                Manage your Salem YMA member profile
+                Manage your YMA Salem Branch member profile
               </Text>
             </View>
 
@@ -396,7 +396,7 @@ export default function MoreScreen() {
                 </View>
 
                 <Text style={styles.menuText}>
-                  Manage Salem YMA members and administration
+                  Manage YMA Salem Branch members and administration
                 </Text>
               </View>
 
@@ -456,7 +456,7 @@ export default function MoreScreen() {
               </Text>
 
               <Text style={styles.logoutText}>
-                Sign out from your Salem YMA account
+                Sign out from your YMA Salem Branch account
               </Text>
             </View>
 
@@ -493,7 +493,7 @@ export default function MoreScreen() {
                 </Text>
 
                 <Text style={styles.loginText}>
-                  Sign in or create your Salem YMA account
+                  Sign in or create your YMA Salem Branch account
                 </Text>
               </View>
 
@@ -510,7 +510,7 @@ export default function MoreScreen() {
         <View style={styles.footerLine} />
 
         <Text style={styles.footerTitle}>
-          YMA SALEM BRANCH
+          YMA Salem Branch
         </Text>
 
         <Text style={styles.footerText}>
@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
 
-  /* YMA SALEM BRANCH / ABOUT US CARD */
+  /* YMA Salem Branch / ABOUT US CARD */
   profileCard: {
     marginHorizontal: 18,
     marginTop: 18,

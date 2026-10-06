@@ -1,6 +1,7 @@
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -15,6 +16,7 @@ import { useEffect, useState } from 'react';
 
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 type Member = {
   id: number;
   full_name: string | null;
@@ -237,17 +239,16 @@ export default function MemberDetailScreen() {
   if (loading) {
     return (
       <View style={styles.loadingScreen}>
-        <LinearGradient
-          colors={['#D32F2F', '#8E1B1B', '#111111']}
-          style={styles.loadingLogo}
-        >
-          <Text style={styles.loadingLogoText}>
-            SY
-          </Text>
-        </LinearGradient>
+        <View style={styles.loadingLogo}>
+          <Image
+            source={require('../assets/yma-logo.png')}
+            style={styles.loadingLogoImage}
+            resizeMode="contain"
+          />
+        </View>
 
         <Text style={styles.loadingTitle}>
-          SALEM YMA
+          YMA Salem Branch
         </Text>
 
         <ActivityIndicator
@@ -313,17 +314,10 @@ export default function MemberDetailScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
-          <Pressable
-            onPress={() => router.replace('/admin')}
-            style={styles.backCircle}
-          >
-            <Text style={styles.backIcon}>
-              ‹
-            </Text>
-          </Pressable>
+          <AppBackButton onPress={() => router.replace('/admin')} />
 
           <Text style={styles.eyebrow}>
-            SALEM YMA • ADMIN
+            YMA Salem Branch • ADMIN
           </Text>
 
           <Text style={styles.headerTitle}>
@@ -808,7 +802,7 @@ export default function MemberDetailScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerTitle}>
-            SALEM YMA
+            YMA Salem Branch
           </Text>
 
           <Text style={styles.footerText}>
@@ -884,6 +878,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 22,
     fontWeight: '900',
+  },
+
+  loadingLogoImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
   },
 
   loadingTitle: {

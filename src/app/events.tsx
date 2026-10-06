@@ -65,6 +65,9 @@ function getEventTime(dateString: string | null) {
   });
 }
 
+
+import AppBackButton from '../components/AppBackButton';
+
 export default function EventsScreen() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,17 +132,22 @@ export default function EventsScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
-          <Text style={styles.headerEyebrow}>
-            SALEM YMA
-          </Text>
+          <View style={styles.headerRow}>
+            <AppBackButton />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.headerEyebrow}>
+                YMA Salem Branch
+              </Text>
 
-          <Text style={styles.headerTitle}>
-            Events
-          </Text>
+              <Text style={styles.headerTitle}>
+                Events
+              </Text>
 
-          <Text style={styles.headerText}>
-            Upcoming programmes and events
-          </Text>
+              <Text style={styles.headerText}>
+                Upcoming programmes and events
+              </Text>
+            </View>
+          </View>
         </LinearGradient>
 
         <Text style={styles.sectionTitle}>
@@ -179,7 +187,7 @@ export default function EventsScreen() {
             </Text>
 
             <Text style={styles.emptyText}>
-              Salem YMA events and programmes will appear here.
+              YMA Salem Branch events and programmes will appear here.
             </Text>
           </View>
         )}
@@ -327,7 +335,7 @@ export default function EventsScreen() {
             </Text>
 
             <Text style={styles.infoText}>
-              Salem YMA events, programmes and important
+              YMA Salem Branch events, programmes and important
               dates will be updated here.
             </Text>
           </View>
@@ -386,7 +394,7 @@ export default function EventsScreen() {
 
               <View style={styles.detailContent}>
                 <Text style={styles.detailEyebrow}>
-                  SALEM YMA EVENT
+                  YMA Salem Branch EVENT
                 </Text>
 
                 <Text style={styles.detailTitle}>
@@ -490,6 +498,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
+
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start' },
 
   header: {
     paddingTop: 55,

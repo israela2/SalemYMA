@@ -1,5 +1,4 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -19,6 +18,7 @@ import {
 
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 type GalleryItem = {
   id: string;
   title: string;
@@ -92,7 +92,7 @@ export default function GalleryScreen() {
         oldResult.data ?? []
       ).map((item: any) => ({
         id: `old-${item.id}`,
-        title: item.title || 'Salem YMA',
+        title: item.title || 'YMA Salem Branch',
         album: item.album || 'Activities',
         media_type:
           item.media_type === 'video'
@@ -108,7 +108,7 @@ export default function GalleryScreen() {
         newResult.data ?? []
       ).map((item: any) => ({
         id: `new-${item.id}`,
-        title: item.title || 'Salem YMA',
+        title: item.title || 'YMA Salem Branch',
         album:
           item.media_type === 'video'
             ? 'Videos'
@@ -321,15 +321,10 @@ export default function GalleryScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
-          <Pressable
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <Text style={styles.backIcon}>‹</Text>
-          </Pressable>
+          <AppBackButton />
 
           <Text style={styles.headerSmall}>
-            YMA SALEM BRANCH
+            YMA Salem Branch
           </Text>
 
           <Text style={styles.headerTitle}>
@@ -337,7 +332,7 @@ export default function GalleryScreen() {
           </Text>
 
           <Text style={styles.headerText}>
-            Salem YMA photos and memories
+            YMA Salem Branch photos and memories
           </Text>
         </LinearGradient>
 
@@ -351,15 +346,19 @@ export default function GalleryScreen() {
             </Text>
 
             <Text style={styles.sectionSubtitle}>
-              Salem YMA photos, videos and memories
+              YMA Salem Branch photos, videos and memories
             </Text>
           </View>
         </View>
 
         {selectedAlbum && selectedAlbum !== 'All' ? (
-          <Pressable onPress={() => { setSelectedAlbum(''); setSelectedAlbumKind(''); }} style={styles.backToAlbumsButton}>
-            <Text style={styles.backToAlbumsText}>‹ Back to albums</Text>
-          </Pressable>
+          <AppBackButton
+            onPress={() => {
+              setSelectedAlbum('');
+              setSelectedAlbumKind('');
+            }}
+            style={{ marginHorizontal: 18, marginBottom: 8 }}
+          />
         ) : null}
 
         {/* COUNT */}
@@ -385,7 +384,7 @@ export default function GalleryScreen() {
             </Text>
 
             <Text style={styles.stateText}>
-              Salem YMA media te kan load mek.
+              YMA Salem Branch media te kan load mek.
             </Text>
           </View>
         ) : errorMessage ? (
@@ -554,7 +553,7 @@ export default function GalleryScreen() {
                     <Text
                       style={styles.videoHeadingText}
                     >
-                      Salem YMA video memories
+                      YMA Salem Branch video memories
                     </Text>
                   </View>
                 </View>
@@ -643,11 +642,11 @@ export default function GalleryScreen() {
 
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>
-              Salem YMA Gallery
+              YMA Salem Branch Gallery
             </Text>
 
             <Text style={styles.infoText}>
-              Salem YMA programme, activity, event leh
+              YMA Salem Branch programme, activity, event leh
               member-te thlalak te hetah hian kan dah ang.
             </Text>
           </View>

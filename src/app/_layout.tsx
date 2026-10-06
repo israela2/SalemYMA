@@ -150,8 +150,8 @@ export default function TabLayout() {
           if (row.data?.type !== 'news') return;
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
             try {
-              new Notification(row.title || 'New Salem YMA News', {
-                body: row.body || 'A new Salem YMA news or announcement is available.',
+              new Notification(row.title || 'New YMA Salem Branch News', {
+                body: row.body || 'A new YMA Salem Branch news or announcement is available.',
                 data: row.data || {},
                 icon: '/favicon.png',
               });
@@ -256,7 +256,7 @@ export default function TabLayout() {
             letterSpacing: 1,
           }}
         >
-          YMA SALEM BRANCH
+          YMA Salem Branch
         </Text>
 
         <Text
@@ -456,6 +456,20 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
+        name="chhiatni-fund"
+        options={{
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="chhiatni-admin"
+        options={{
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
         name="notifications"
         options={{
           href: null,
@@ -530,6 +544,7 @@ export default function TabLayout() {
           href: null,
         }}
       />
+
     </Tabs>
   );
 }

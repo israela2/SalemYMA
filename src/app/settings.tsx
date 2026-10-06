@@ -6,6 +6,9 @@ import {
   View,
 } from 'react-native';
 
+
+import AppBackButton from '../components/AppBackButton';
+
 export default function SettingsScreen() {
   return (
     <ScrollView
@@ -14,17 +17,22 @@ export default function SettingsScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerEyebrow}>
-          SALEM YMA
-        </Text>
+        <View style={styles.headerRow}>
+          <AppBackButton />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={styles.headerEyebrow}>
+              YMA Salem Branch
+            </Text>
 
-        <Text style={styles.headerTitle}>
-          Settings
-        </Text>
+            <Text style={styles.headerTitle}>
+              Settings
+            </Text>
 
-        <Text style={styles.headerText}>
-          App preferences and settings
-        </Text>
+            <Text style={styles.headerText}>
+              App preferences and settings
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* Notifications */}
@@ -45,7 +53,7 @@ export default function SettingsScreen() {
           </Text>
 
           <Text style={styles.settingText}>
-            Receive Salem YMA announcements and updates
+            Receive YMA Salem Branch announcements and updates
           </Text>
         </View>
 
@@ -130,7 +138,7 @@ export default function SettingsScreen() {
 
       <View style={styles.aboutCard}>
         <Text style={styles.aboutTitle}>
-          Salem YMA
+          YMA Salem Branch
         </Text>
 
         <Text style={styles.aboutSubtitle}>
@@ -146,7 +154,7 @@ export default function SettingsScreen() {
         </Text>
 
         <Text style={styles.copyright}>
-          Salem YMA Mobile Application
+          YMA Salem Branch Mobile Application
         </Text>
       </View>
 

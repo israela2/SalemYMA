@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 type GasBooking = {
   id: number;
   full_name: string;
@@ -315,18 +316,11 @@ export default function GasBookingScreen() {
         style={styles.header}
       >
         <View style={styles.headerRow}>
-          <Pressable
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <Text style={styles.backIcon}>
-              ‹
-            </Text>
-          </Pressable>
+          <AppBackButton />
 
           <View style={styles.headerText}>
             <Text style={styles.smallTitle}>
-              SALEM YMA
+              YMA Salem Branch
             </Text>
 
             <Text style={styles.title}>
@@ -377,7 +371,7 @@ export default function GasBookingScreen() {
                   </Text>
 
                   <Text style={styles.successSubtitle}>
-                    Your booking request has been received by Salem YMA.
+                    Your booking request has been received by YMA Salem Branch.
                   </Text>
                 </View>
               </View>
@@ -490,7 +484,7 @@ export default function GasBookingScreen() {
                 </Text>
 
                 <Text style={styles.waitText}>
-                  You cannot submit another gas booking while this booking is active. Please wait for Salem YMA administration to process your request.
+                  You cannot submit another gas booking while this booking is active. Please wait for YMA Salem Branch administration to process your request.
                 </Text>
               </View>
             </>
@@ -676,7 +670,7 @@ export default function GasBookingScreen() {
                 </Text>
 
                 <Text style={styles.infoText}>
-                  Your booking request will be sent to the Salem YMA administration for processing.
+                  Your booking request will be sent to the YMA Salem Branch administration for processing.
                 </Text>
 
                 <View style={styles.statusRow}>
@@ -691,7 +685,7 @@ export default function GasBookingScreen() {
           )}
 
           <Text style={styles.footer}>
-            SALEM YMA BRANCH
+            YMA Salem Branch
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

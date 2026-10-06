@@ -18,6 +18,7 @@ import {
 
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 type CemeteryRecord = {
   id: number;
   deceased_name: string;
@@ -410,7 +411,7 @@ export default function CemeteryScreen() {
             <Text
               style={styles.headerEyebrow}
             >
-              SALEM YMA BRANCH
+              YMA Salem Branch
             </Text>
 
             <Text
@@ -426,16 +427,7 @@ export default function CemeteryScreen() {
             </Text>
           </View>
 
-          <Pressable
-            onPress={() => router.back()}
-            style={styles.closeButton}
-          >
-            <Text
-              style={styles.closeButtonText}
-            >
-              ×
-            </Text>
-          </Pressable>
+          <AppBackButton />
         </View>
       </LinearGradient>
 

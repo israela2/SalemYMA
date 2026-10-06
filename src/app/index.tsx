@@ -34,7 +34,7 @@ export default function HomeScreen() {
           <View style={styles.brandArea}>
             <View style={styles.logoContainer}>
               <Image
-                source={require('../../assets/images/yma-logo.png')}
+                source={require('../assets/yma-logo.png')}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
@@ -127,6 +127,51 @@ export default function HomeScreen() {
           </LinearGradient>
         </Pressable>
 
+        {/* Chhiatni Fund Featured Card */}
+        <Pressable
+          style={[styles.featureCard, styles.featureCardSpaced]}
+          onPress={() => router.push('/chhiatni-fund')}
+        >
+          <LinearGradient
+            colors={['#111111', '#8E1B1B', '#C62828']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.featureGradient}
+          >
+            <View style={styles.featureTop}>
+              <View style={styles.featureIcon}>
+                <Text style={styles.featureIconText}>
+                  🤝
+                </Text>
+              </View>
+
+              <View style={styles.featureBadge}>
+                <Text style={styles.featureBadgeText}>
+                  FAMILY FUND
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.featureTitle}>
+              Chhiatni Fund
+            </Text>
+
+            <Text style={styles.featureDescription}>
+              Your family Chhiatni Fund bill, payment and payment history.
+            </Text>
+
+            <View style={styles.featureBottom}>
+              <Text style={styles.featureAction}>
+                Open Service
+              </Text>
+
+              <Text style={styles.featureArrow}>
+                →
+              </Text>
+            </View>
+          </LinearGradient>
+        </Pressable>
+
 
         {/* Zonun Featured Card */}
 <Pressable
@@ -160,7 +205,7 @@ export default function HomeScreen() {
     </Text>
 
     <Text style={styles.gasDescription}>
-      Salem YMA Zonun leh thuthlung te PDF hmangin chhiar rawh.
+      YMA Salem Branch Zonun leh thuthlung te PDF hmangin chhiar rawh.
     </Text>
 
     <View style={styles.gasBottom}>
@@ -208,7 +253,7 @@ export default function HomeScreen() {
             </Text>
 
             <Text style={styles.gasDescription}>
-              Book your LPG gas cylinder easily through Salem YMA.
+              Book your LPG gas cylinder easily through YMA Salem Branch.
             </Text>
 
             <View style={styles.gasBottom}>
@@ -354,7 +399,7 @@ export default function HomeScreen() {
             </View>
 
             <Text style={styles.newsTitle}>
-              Salem YMA Important Announcement
+              YMA Salem Branch Important Announcement
             </Text>
 
             <Text
@@ -362,7 +407,7 @@ export default function HomeScreen() {
               numberOfLines={2}
             >
               Important announcements and information
-              from Salem YMA will be shared here.
+              from YMA Salem Branch will be shared here.
             </Text>
           </View>
 
@@ -405,7 +450,7 @@ export default function HomeScreen() {
 
           <View style={styles.eventContent}>
             <Text style={styles.eventTitle}>
-              Salem YMA Programme
+              YMA Salem Branch Programme
             </Text>
 
             <Text style={styles.eventInfo}>
@@ -441,7 +486,7 @@ export default function HomeScreen() {
             </Text>
 
             <Text style={styles.messageText}>
-              Stay connected with Salem YMA through
+              Stay connected with YMA Salem Branch through
               news, activities, programmes and updates.
             </Text>
           </View>
@@ -572,6 +617,10 @@ const styles = StyleSheet.create({
   featureCard: {
     borderRadius: 22,
     overflow: 'hidden',
+  },
+
+  featureCardSpaced: {
+    marginTop: 12,
   },
 
   featureGradient: {

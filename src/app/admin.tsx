@@ -3,16 +3,16 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { router, useFocusEffect } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Pressable,
   RefreshControl,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,9 +20,10 @@ import {
   View,
 } from 'react-native';
 
-import { supabase } from '../lib/supabase';
 import { publishNotification } from '../lib/notification-service';
+import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 type Member = {
   id: number;
   user_id?: string | null;
@@ -575,7 +576,7 @@ export default function AdminScreen() {
   const [wasteBills, setWasteBills] = useState<WasteBill[]>([]);
   const [wastePaymentSettings, setWastePaymentSettings] = useState<WastePaymentSettings | null>(null);
   const [wasteUpiId, setWasteUpiId] = useState('');
-  const [wastePayeeName, setWastePayeeName] = useState('Salem YMA');
+  const [wastePayeeName, setWastePayeeName] = useState('YMA Salem Branch');
   const [wastePaymentInstructions, setWastePaymentInstructions] = useState('Pay using any UPI app and submit the UTR after payment.');
   const [savingWastePaymentSettings, setSavingWastePaymentSettings] = useState(false);
   const [featureVisibility, setFeatureVisibility] = useState({ cemetery: false, gas_booking: false });
@@ -655,7 +656,7 @@ export default function AdminScreen() {
     useState('');
   const [eventLocation, setEventLocation] = useState('');
   const [eventBranch, setEventBranch] =
-    useState('Salem YMA Branch');
+    useState('YMA Salem Branch');
   const [eventImage, setEventImage] = useState('');
   const [eventDateValue, setEventDateValue] =
     useState<Date | null>(new Date());
@@ -673,18 +674,14 @@ export default function AdminScreen() {
   const [galleryUploadProgress, setGalleryUploadProgress] =
     useState({ current: 0, total: 0 });
 
-  const [wasteMemberId, setWasteMemberId] = useState('');
-  const [wasteAccountNo, setWasteAccountNo] =
-    useState('YMA-0001');
+  const [selectedWasteMemberIds, setSelectedWasteMemberIds] = useState<string[]>([]);
+  const [wasteMemberSearch, setWasteMemberSearch] = useState('');
   const [wasteBillMonth, setWasteBillMonth] =
     useState('');
   const [wasteAmount, setWasteAmount] = useState('');
   const [wasteDueDate, setWasteDueDate] = useState('');
   const [wasteStatus, setWasteStatus] =
     useState('unpaid');
-  const [bulkWasteAmount, setBulkWasteAmount] = useState('200');
-  const [bulkWasteBillMonth, setBulkWasteBillMonth] = useState('');
-  const [creatingAllWasteBills, setCreatingAllWasteBills] = useState(false);
   const [savingWasteBill, setSavingWasteBill] =
     useState(false);
 
@@ -1259,12 +1256,12 @@ export default function AdminScreen() {
           tr:nth-child(even) { background: #f7f7f7; }
           .footer { margin-top: 18px; font-size: 9px; color: #777; border-top: 1px solid #ddd; padding-top: 8px; }
         </style></head><body>
-          <h1>SALEM YMA</h1>
+          <h1>YMA Salem Branch</h1>
           <h2>Gas Booking History / Archive</h2>
           <div class="subtitle">Gas Booking Deleted Date: ${escapeHtml(selectedLabel)} &nbsp; • &nbsp; Deleted Bookings: ${records.length}</div>
           <table><thead><tr><th>No.</th><th>Booker Name</th><th>Phone Number</th><th>Address</th><th>Gas Booked</th></tr></thead>
           <tbody>${rows}</tbody></table>
-          <div class="footer">SALEM YMA • GAS BOOKING HISTORY • Deleted booking records are retained for reference.</div>
+          <div class="footer">YMA Salem Branch • GAS BOOKING HISTORY • Deleted booking records are retained for reference.</div>
         </body></html>`;
 
       if (Platform.OS === 'web') {
@@ -1303,7 +1300,7 @@ export default function AdminScreen() {
 
         Alert.alert(
           'Access denied',
-          'Only approved Salem YMA administrators can access this page.',
+          'Only approved YMA Salem Branch administrators can access this page.',
           [
             {
               text: 'OK',
@@ -1557,7 +1554,7 @@ export default function AdminScreen() {
         const settings = paymentSettings as WastePaymentSettings;
         setWastePaymentSettings(settings);
         setWasteUpiId(settings.upi_id || '');
-        setWastePayeeName(settings.payee_name || 'Salem YMA');
+        setWastePayeeName(settings.payee_name || 'YMA Salem Branch');
         setWastePaymentInstructions(settings.instructions || 'Pay using any UPI app and submit the UTR after payment.');
       }
 
@@ -1855,7 +1852,7 @@ export default function AdminScreen() {
 
   async function saveAbout() {
     if (!aboutContent.trim()) {
-      Alert.alert('Missing content', 'Please enter Salem YMA Chanchin.');
+      Alert.alert('Missing content', 'Please enter YMA Salem Branch Chanchin.');
       return;
     }
     setSavingAbout(true);
@@ -1864,9 +1861,9 @@ export default function AdminScreen() {
         .from('branch_info')
         .upsert({ id: 1, about_content: aboutContent.trim(), updated_at: new Date().toISOString() });
       if (error) throw error;
-      Alert.alert('Updated', 'Salem YMA Chanchin updated successfully.');
+      Alert.alert('Updated', 'YMA Salem Branch Chanchin updated successfully.');
     } catch (error: any) {
-      Alert.alert('Update failed', error?.message || 'Unable to update Salem YMA Chanchin.');
+      Alert.alert('Update failed', error?.message || 'Unable to update YMA Salem Branch Chanchin.');
     } finally {
       setSavingAbout(false);
     }
@@ -1938,7 +1935,7 @@ export default function AdminScreen() {
           .insert(payload);
 
         if (error) throw error;
-        await publishNotification('New Salem YMA News', newsTitle.trim(), { type: 'news' });
+        await publishNotification('New YMA Salem Branch News', newsTitle.trim(), { type: 'news' });
 
         Alert.alert(
           'Published',
@@ -1995,7 +1992,7 @@ export default function AdminScreen() {
     setEventTitle('');
     setEventDescription('');
     setEventLocation('');
-    setEventBranch('Salem YMA Branch');
+    setEventBranch('YMA Salem Branch');
     setEventImage('');
     setEventDateValue(new Date());
     setEditingEventId(null);
@@ -2012,7 +2009,7 @@ export default function AdminScreen() {
     setEventLocation(item.location || '');
     setEventBranch(
       item.organizing_branch ||
-        'Salem YMA Branch',
+        'YMA Salem Branch',
     );
     setEventImage(item.image_url || '');
 
@@ -2108,7 +2105,7 @@ export default function AdminScreen() {
         image_url: eventImage || null,
         organizing_branch:
           eventBranch.trim() ||
-          'Salem YMA Branch',
+          'YMA Salem Branch',
         is_published: true,
         updated_at:
           new Date().toISOString(),
@@ -2129,7 +2126,7 @@ export default function AdminScreen() {
           .insert({ ...payload, created_at: createdAt });
         if (error) throw error;
         setEvents(current => [{ id: Date.now(), ...payload, created_at: createdAt }, ...current]);
-        await publishNotification('New Salem YMA Programme', eventTitle.trim(), { type: 'event' });
+        await publishNotification('New YMA Salem Branch Programme', eventTitle.trim(), { type: 'event' });
         Alert.alert('Published','Event published successfully.');
       }
 
@@ -2220,7 +2217,7 @@ export default function AdminScreen() {
     }
     try {
       setSavingWastePaymentSettings(true);
-      const { data, error } = await supabase.from('waste_payment_settings').upsert({ id: 1, upi_id: wasteUpiId.trim(), payee_name: wastePayeeName.trim() || 'Salem YMA', instructions: wastePaymentInstructions.trim() || null, updated_at: new Date().toISOString() }, { onConflict: 'id' }).select('id, upi_id, payee_name, instructions').single();
+      const { data, error } = await supabase.from('waste_payment_settings').upsert({ id: 1, upi_id: wasteUpiId.trim(), payee_name: wastePayeeName.trim() || 'YMA Salem Branch', instructions: wastePaymentInstructions.trim() || null, updated_at: new Date().toISOString() }, { onConflict: 'id' }).select('id, upi_id, payee_name, instructions').single();
       if (error) throw error;
       setWastePaymentSettings(data as WastePaymentSettings);
       Alert.alert('Saved', 'Waste Fee UPI settings have been updated.');
@@ -2230,7 +2227,7 @@ export default function AdminScreen() {
 
   async function downloadWastePaymentReport() {
     const rows = wasteBills.map((bill) => { const member = members.find((m) => m.user_id === bill.user_id); return `<tr><td>${bill.house_number || member?.house_number || '-'}</td><td>${member?.full_name || '-'}</td><td>${bill.account_no || '-'}</td><td>${bill.bill_month || '-'}</td><td>₹${Number(bill.amount || 0).toFixed(2)}</td><td>${bill.status || '-'}</td><td>${bill.payment_method || '-'}</td><td>${bill.payment_utr || '-'}</td><td>${bill.receipt_no || '-'}</td><td>${formatDateTime(bill.paid_at || bill.payment_submitted_at || bill.created_at)}</td></tr>`; }).join('');
-    const html = `<html><body style="font-family:Arial;padding:24px"><h1>SALEM YMA — Waste Fee Payment Report</h1><p>Generated ${formatDateTime(new Date().toISOString())}</p><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th>House No.</th><th>Member</th><th>Account</th><th>Month</th><th>Amount</th><th>Status</th><th>Method</th><th>UTR</th><th>Receipt</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+    const html = `<html><body style="font-family:Arial;padding:24px"><h1>YMA Salem Branch — Waste Fee Payment Report</h1><p>Generated ${formatDateTime(new Date().toISOString())}</p><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th>House No.</th><th>Member</th><th>Account</th><th>Month</th><th>Amount</th><th>Status</th><th>Method</th><th>UTR</th><th>Receipt</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
     try {
       if (Platform.OS === 'web') {
         const printWindow = window.open('', '_blank');
@@ -2245,178 +2242,168 @@ export default function AdminScreen() {
     } catch (error: any) { Alert.alert('Report error', error?.message || 'Unable to create payment report.'); }
   }
 
+  const filteredWasteMembers = members.filter((member) => {
+    if (!member.user_id) return false;
+    const q = wasteMemberSearch.trim().toLowerCase();
+    if (!q) return true;
+    return [member.full_name, member.house_number, member.phone, member.email]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(q));
+  });
+
+  function toggleWasteMemberSelection(userId?: string | null) {
+    if (!userId) return;
+    setSelectedWasteMemberIds((current) =>
+      current.includes(userId)
+        ? current.filter((id) => id !== userId)
+        : [...current, userId]
+    );
+  }
+
+  function selectedWasteMembersSummary(list: Member[], ids: string[]) {
+    const names = list
+      .filter((member) => member.user_id && ids.includes(member.user_id))
+      .map((member) => `${member.full_name} (House No. ${member.house_number || '—'})`);
+    return names.join(' • ');
+  }
+
+  function toggleAllVisibleWasteMembers() {
+    const visibleIds = filteredWasteMembers
+      .map((member) => member.user_id)
+      .filter(Boolean) as string[];
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedWasteMemberIds.includes(id));
+    setSelectedWasteMemberIds((current) => {
+      if (allSelected) return current.filter((id) => !visibleIds.includes(id));
+      return Array.from(new Set([...current, ...visibleIds]));
+    });
+  }
+
   function resetWasteBillForm() {
-    setWasteMemberId('');
-    setWasteAccountNo('YMA-0001');
+    setSelectedWasteMemberIds([]);
+    setWasteMemberSearch('');
     setWasteBillMonth('');
     setWasteAmount('');
     setWasteDueDate('');
     setWasteStatus('unpaid');
   }
 
-  async function createWasteBillsForAllMembers() {
-    const amount = Number(bulkWasteAmount.replace(/,/g, ''));
-    const billMonth = bulkWasteBillMonth.trim();
-
-    if (!billMonth) {
-      Alert.alert('Missing bill month', 'Please enter the billing month first.');
-      return;
-    }
-
-    if (!Number.isFinite(amount) || amount < 0) {
-      Alert.alert('Invalid amount', 'Please enter a valid Waste Fee amount.');
-      return;
-    }
-
-    const householdMembers = members.filter(
-      (member) => Boolean(member.user_id) && Boolean(member.house_number?.trim()),
-    );
-    if (!householdMembers.length) {
-      Alert.alert('No household data', 'Members must have a House Number before Waste Fee bills can be created.');
-      return;
-    }
-
-    const households = Array.from(
-      new Map(
-        householdMembers.map((member) => [
-          member.house_number!.trim().toLowerCase(),
-          member,
-        ]),
-      ).values(),
-    );
-
-    const confirmed = await webConfirm(
-      'Create household bills?',
-      `This will create one ₹${amount.toFixed(2)} Waste Fee bill for each of ${households.length} House Numbers for ${billMonth}. Same-household members will share one bill.`,
-    );
-    if (!confirmed) return;
-
-    try {
-      setCreatingAllWasteBills(true);
-
-      const { data: existingBills, error: existingError } = await supabase
-        .from('waste_bills')
-        .select('user_id, bill_month, house_number')
-        .eq('bill_month', billMonth);
-
-      if (existingError) throw existingError;
-
-      const existingHouseNumbers = new Set(
-        (existingBills || [])
-          .map((bill: any) => String(bill.house_number || '').trim().toLowerCase())
-          .filter(Boolean),
-      );
-
-      const rows = households
-        .filter((member) => !existingHouseNumbers.has(member.house_number!.trim().toLowerCase()))
-        .map((member) => ({
-          user_id: member.user_id,
-          house_number: member.house_number!.trim(),
-          account_no: member.house_number!.trim(),
-          bill_month: billMonth,
-          amount,
-          status: 'unpaid',
-        }));
-
-      if (!rows.length) {
-        Alert.alert('No new bills', `Every House Number already has a bill for ${billMonth}.`);
-        return;
-      }
-
-      const batchSize = 100;
-      for (let index = 0; index < rows.length; index += batchSize) {
-        const batch = rows.slice(index, index + batchSize);
-        const { error } = await supabase.from('waste_bills').insert(batch);
-        if (error) throw error;
-      }
-
-      Alert.alert(
-        'Household bills created',
-        `${rows.length} household Waste Fee bill${rows.length === 1 ? '' : 's'} created for ${billMonth}. Each House Number has one ₹${amount.toFixed(2)} bill.`,
-      );
-
-      await loadAll();
-    } catch (error: any) {
-      console.error('[Waste Fee] Household bill creation failed:', error);
-      Alert.alert('Household bill error', error?.message || 'Unable to create household Waste Fee bills.');
-    } finally {
-      setCreatingAllWasteBills(false);
-    }
-  }
+  const selectedWasteHouseNumbers = useMemo(() => {
+    const seen = new Set<string>();
+    members
+      .filter((member) => Boolean(member.user_id) && selectedWasteMemberIds.includes(member.user_id as string))
+      .forEach((member) => {
+        const house = member.house_number?.trim();
+        if (house) seen.add(house);
+      });
+    return Array.from(seen);
+  }, [members, selectedWasteMemberIds]);
 
   async function saveWasteBill() {
-    if (!wasteMemberId) {
-      Alert.alert('Select member', 'Please select a member first.');
+    if (!selectedWasteMemberIds.length) {
+      Alert.alert('Select family member', 'Select at least one registered member. The selected member represents that member\'s whole household by House Number.');
       return;
     }
 
-    const selectedWasteMember = members.find((member) => member.user_id === wasteMemberId);
-    if (!selectedWasteMember?.house_number?.trim()) {
-      Alert.alert('House Number required', 'This member does not have a House Number. Add it before creating the Waste Fee bill.');
+    const selectedWasteMembers = members.filter(
+      (member) => Boolean(member.user_id) && selectedWasteMemberIds.includes(member.user_id as string),
+    );
+
+    if (!selectedWasteMembers.length) {
+      Alert.alert('No valid members', 'The selected member records are no longer available. Please select again.');
+      return;
+    }
+
+    const selectedFamilies = Array.from(
+      new Map(
+        selectedWasteMembers
+          .map((member) => {
+            const house = member.house_number?.trim();
+            if (!house || !member.user_id) return null;
+            return [house, member] as const;
+          })
+          .filter(Boolean) as Array<[string, Member]>
+      ).entries()
+    ).map(([houseNumber, member]) => ({ houseNumber, member }));
+
+    if (!selectedFamilies.length) {
+      Alert.alert('House Number required', 'Every selected member must have a House Number before creating a Waste Fee bill.');
       return;
     }
 
     if (!wasteBillMonth.trim()) {
-      Alert.alert(
-        'Missing bill month',
-        'Please enter the bill month.',
-      );
+      Alert.alert('Missing bill month', 'Please enter the bill month.');
       return;
     }
 
     if (!wasteAmount.trim()) {
-      Alert.alert(
-        'Missing amount',
-        'Please enter the bill amount.',
-      );
+      Alert.alert('Missing amount', 'Please enter the bill amount.');
       return;
     }
 
-    const amount = Number(
-      wasteAmount.replace(/,/g, ''),
+    const amount = Number(wasteAmount.replace(/,/g, ''));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      Alert.alert('Invalid amount', 'Please enter a Waste Fee amount greater than zero.');
+      return;
+    }
+
+    const confirmed = await webConfirm(
+      'Create household Waste Fee bills?',
+      `Create ₹${amount.toFixed(2)} Waste Fee bill${selectedFamilies.length === 1 ? '' : 's'} for ${selectedFamilies.length} household${selectedFamilies.length === 1 ? '' : 's'} for ${wasteBillMonth.trim()}? Selecting one member bills the whole family registered under that House Number.`,
     );
-
-    if (Number.isNaN(amount) || amount < 0) {
-      Alert.alert(
-        'Invalid amount',
-        'Please enter a valid amount.',
-      );
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       setSavingWasteBill(true);
 
-      const { error } = await supabase
+      const houseNumbers = selectedFamilies.map((item) => item.houseNumber);
+      const { data: existingBills, error: existingError } = await supabase
         .from('waste_bills')
-        .insert({
-          user_id: wasteMemberId,
-          house_number: selectedWasteMember.house_number.trim(),
-          account_no:
-            selectedWasteMember.house_number.trim(),
-          bill_month:
-            wasteBillMonth.trim(),
+        .select('id, user_id, house_number, bill_month')
+        .eq('bill_month', wasteBillMonth.trim())
+        .in('house_number', houseNumbers);
+
+      if (existingError) throw existingError;
+
+      const existingHouses = new Set(
+        (existingBills || [])
+          .map((row: any) => String(row.house_number || '').trim())
+          .filter(Boolean),
+      );
+
+      const rows = selectedFamilies
+        .filter(({ houseNumber }) => !existingHouses.has(houseNumber))
+        .map(({ houseNumber, member }) => ({
+          // One household bill: the selected member is only the representative.
+          // All family members with this House Number see/pay the same record.
+          user_id: member.user_id,
+          house_number: houseNumber,
+          account_no: houseNumber,
+          bill_month: wasteBillMonth.trim(),
           amount,
-          due_date:
-            wasteDueDate.trim() || null,
+          due_date: wasteDueDate.trim() || null,
           status: wasteStatus || 'unpaid',
-        });
+        }));
 
-      if (error) throw error;
+      if (!rows.length) {
+        Alert.alert('No new household bills', `All selected House Numbers already have a Waste Fee bill for ${wasteBillMonth.trim()}.`);
+        return;
+      }
 
+      for (let index = 0; index < rows.length; index += 100) {
+        const { error } = await supabase.from('waste_bills').insert(rows.slice(index, index + 100));
+        if (error) throw error;
+      }
+
+      const skippedFamilies = selectedFamilies.length - rows.length;
       Alert.alert(
-        'Bill created',
-        'Waste collection bill added successfully.',
+        'Household bills created',
+        `${rows.length} Waste Fee household bill${rows.length === 1 ? '' : 's'} created successfully.${skippedFamilies ? ` ${skippedFamilies} selected household${skippedFamilies === 1 ? '' : 's'} already had a Waste Fee bill for ${wasteBillMonth.trim()}.` : ''}`,
       );
 
       resetWasteBillForm();
       await loadAll();
     } catch (error: any) {
-      Alert.alert(
-        'Save failed',
-        error?.message ||
-          'Unable to create waste bill.',
-      );
+      Alert.alert('Save failed', error?.message || 'Unable to create household Waste Fee bills.');
     } finally {
       setSavingWasteBill(false);
     }
@@ -3069,12 +3056,12 @@ export default function AdminScreen() {
           tr:nth-child(even) { background: #f7f7f7; }
           .footer { margin-top: 18px; font-size: 9px; color: #777; border-top: 1px solid #ddd; padding-top: 8px; }
         </style></head><body>
-          <h1>SALEM YMA</h1>
+          <h1>YMA Salem Branch</h1>
           <h2>Gas Booking List</h2>
           <div class="subtitle">Generated: ${escapeHtml(formatDate(new Date().toISOString()))} &nbsp; • &nbsp; Total Bookings: ${gasBookings.length}</div>
           <table><thead><tr><th>No.</th><th>Booker Name</th><th>Phone Number</th><th>Gas Booked</th></tr></thead>
           <tbody>${rows}</tbody></table>
-          <div class="footer">SALEM YMA • GAS BOOKING LIST</div>
+          <div class="footer">YMA Salem Branch • GAS BOOKING LIST</div>
         </body></html>`;
 
       if (Platform.OS === 'web') {
@@ -3428,7 +3415,7 @@ export default function AdminScreen() {
           style={styles.loadingGradient}
         >
           <Text style={styles.loadingTitle}>
-            SALEM YMA
+            YMA Salem Branch
           </Text>
 
           <Text style={styles.loadingSubtitle}>
@@ -3473,9 +3460,10 @@ export default function AdminScreen() {
         style={styles.header}
       >
         <View style={styles.headerTop}>
-          <View>
+          <AppBackButton />
+          <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.headerEyebrow}>
-              SALEM YMA
+              YMA Salem Branch
             </Text>
 
             <Text style={styles.headerTitle}>
@@ -3488,15 +3476,6 @@ export default function AdminScreen() {
                 : 'Full Access Admin • Manage branch content'}
             </Text>
           </View>
-
-          <Pressable
-            style={styles.closeButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.closeButtonText}>
-              ×
-            </Text>
-          </Pressable>
         </View>
       </LinearGradient>
 
@@ -3522,7 +3501,7 @@ export default function AdminScreen() {
               ['dashboard', 'Dashboard'],
               ['members', 'Members'],
               ['news', 'News'],
-              ['about', 'Salem YMA Chanchin'],
+              ['about', 'YMA Salem Branch Chanchin'],
               ['events', 'Events'],
               ['gallery', 'Gallery'],
               ['waste', 'Waste Bills'],
@@ -3779,7 +3758,7 @@ export default function AdminScreen() {
                 </Text>
 
                 <Text style={styles.welcomeTitle}>
-                  Salem YMA
+                  YMA Salem Branch
                 </Text>
 
                 <Text style={styles.welcomeText}>
@@ -4010,6 +3989,31 @@ export default function AdminScreen() {
             </Pressable>
 
             <Text style={styles.sectionTitle}>
+              Chhiatni Fund Overview
+            </Text>
+
+            <Pressable
+              onPress={() => router.push('/chhiatni-admin')}
+              style={styles.wasteOverviewCard}
+            >
+              <LinearGradient
+                colors={[RED, BLACK]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.wasteOverviewGradient}
+              >
+                <View>
+                  <Text style={styles.wasteOverviewEyebrow}>FAMILY FUND</Text>
+                  <Text style={styles.wasteOverviewAmount}>CHHIATNI</Text>
+                  <Text style={styles.wasteOverviewMeta}>Manage House Number family bills and payments</Text>
+                </View>
+                <View style={styles.wasteOverviewArrow}>
+                  <Text style={styles.wasteOverviewArrowText}>›</Text>
+                </View>
+              </LinearGradient>
+            </Pressable>
+
+            <Text style={styles.sectionTitle}>
               Waste Fee Overview
             </Text>
 
@@ -4097,7 +4101,7 @@ export default function AdminScreen() {
                 ],
                 [
                   'A',
-                  'Salem YMA Chanchin',
+                  'YMA Salem Branch Chanchin',
                   'Update branch information',
                   'about',
                 ],
@@ -4517,18 +4521,18 @@ export default function AdminScreen() {
           <>
             <View style={styles.sectionHeaderRow}>
               <View>
-                <Text style={styles.sectionTitle}>Salem YMA Chanchin</Text>
-                <Text style={styles.sectionDescription}>Update the information shown under More → Salem YMA Chanchin.</Text>
+                <Text style={styles.sectionTitle}>YMA Salem Branch Chanchin</Text>
+                <Text style={styles.sectionDescription}>Update the information shown under More → YMA Salem Branch Chanchin.</Text>
               </View>
             </View>
 
             <View style={styles.formCard}>
-              <Text style={styles.formTitle}>Edit Salem YMA Chanchin</Text>
+              <Text style={styles.formTitle}>Edit YMA Salem Branch Chanchin</Text>
               <Text style={styles.label}>Chanchin</Text>
               <TextInput
                 value={aboutContent}
                 onChangeText={setAboutContent}
-                placeholder="Write Salem YMA Chanchin..."
+                placeholder="Write YMA Salem Branch Chanchin..."
                 placeholderTextColor="#999999"
                 style={[styles.input, styles.textArea]}
                 multiline
@@ -4562,7 +4566,7 @@ export default function AdminScreen() {
                     styles.sectionDescription
                   }
                 >
-                  Create and publish Salem YMA
+                  Create and publish YMA Salem Branch
                   news.
                 </Text>
               </View>
@@ -4857,7 +4861,7 @@ export default function AdminScreen() {
                     styles.sectionDescription
                   }
                 >
-                  Create and manage Salem YMA
+                  Create and manage YMA Salem Branch
                   events.
                 </Text>
               </View>
@@ -5072,7 +5076,7 @@ export default function AdminScreen() {
                 onChangeText={
                   setEventBranch
                 }
-                placeholder="Salem YMA Branch"
+                placeholder="YMA Salem Branch"
                 placeholderTextColor="#999999"
                 style={styles.input}
               />
@@ -5262,7 +5266,7 @@ export default function AdminScreen() {
                 </Text>
 
                 <Text style={styles.emptyText}>
-                  Create your first Salem YMA event above.
+                  Create your first YMA Salem Branch event above.
                 </Text>
               </View>
             )}
@@ -5278,7 +5282,7 @@ export default function AdminScreen() {
                 </Text>
 
                 <Text style={styles.sectionDescription}>
-                  Add and remove Salem YMA photos.
+                  Add and remove YMA Salem Branch photos.
                 </Text>
               </View>
             </View>
@@ -5443,10 +5447,10 @@ export default function AdminScreen() {
               <Text style={styles.label}>UPI ID</Text>
               <TextInput value={wasteUpiId} onChangeText={setWasteUpiId} placeholder="yourname@upi" placeholderTextColor="#999" style={styles.input} autoCapitalize="none" />
               <Text style={styles.label}>Payee Name</Text>
-              <TextInput value={wastePayeeName} onChangeText={setWastePayeeName} placeholder="Salem YMA" placeholderTextColor="#999" style={styles.input} />
+              <TextInput value={wastePayeeName} onChangeText={setWastePayeeName} placeholder="YMA Salem Branch" placeholderTextColor="#999" style={styles.input} />
               <Text style={styles.label}>Payment Instructions</Text>
               <TextInput value={wastePaymentInstructions} onChangeText={setWastePaymentInstructions} placeholder="Instructions for members" placeholderTextColor="#999" style={[styles.input, styles.textArea]} multiline />
-              {wasteUpiId ? <Image source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`upi://pay?pa=${wasteUpiId}&pn=${wastePayeeName || 'Salem YMA'}&cu=INR`)}` }} style={{ width: 180, height: 180, alignSelf: 'center', marginVertical: 10 }} /> : null}
+              {wasteUpiId ? <Image source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`upi://pay?pa=${wasteUpiId}&pn=${wastePayeeName || 'YMA Salem Branch'}&cu=INR`)}` }} style={{ width: 180, height: 180, alignSelf: 'center', marginVertical: 10 }} /> : null}
               <Pressable onPress={saveWastePaymentSettings} style={styles.primaryButton} disabled={savingWastePaymentSettings}>{savingWastePaymentSettings ? <ActivityIndicator color={WHITE} /> : <Text style={styles.primaryButtonText}>SAVE UPI SETTINGS</Text>}</Pressable>
               <Pressable onPress={downloadWastePaymentReport} style={styles.outlineButton}><Text style={styles.outlineButtonText}>DOWNLOAD PAYMENT REPORT</Text></Pressable>
             </View>
@@ -5480,137 +5484,74 @@ export default function AdminScreen() {
             </LinearGradient>
 
             <View style={styles.formCard}>
-              <Text style={styles.formTitle}>Create Household Bills</Text>
-              <Text style={styles.sectionDescription}>Set the amount and billing month. One ₹200 bill is created per House Number, not per member. Same-household members share the same Waste Fee bill.</Text>
+              <Text style={styles.formTitle}>Create Household Waste Fee Bill</Text>
 
-              <Text style={styles.label}>Waste Fee Amount</Text>
-              <TextInput
-                value={bulkWasteAmount}
-                onChangeText={setBulkWasteAmount}
-                placeholder="200"
-                placeholderTextColor="#999999"
-                style={styles.input}
-                keyboardType="decimal-pad"
-              />
+              <Text style={styles.sectionDescription}>Select a member to represent a household. Members sharing the same House Number are one family for billing, so only one bill is created per House Number.</Text>
 
-              <Text style={styles.label}>Billing Month</Text>
-              <TextInput
-                value={bulkWasteBillMonth}
-                onChangeText={setBulkWasteBillMonth}
-                placeholder="October 2026"
-                placeholderTextColor="#999999"
-                style={styles.input}
-              />
-
-              <Pressable
-                onPress={createWasteBillsForAllMembers}
-                style={styles.primaryButton}
-                disabled={creatingAllWasteBills}
-              >
-                {creatingAllWasteBills ? (
-                  <ActivityIndicator color={WHITE} />
-                ) : (
-                  <Text style={styles.primaryButtonText}>CREATE ₹200 WASTE BILL PER HOUSEHOLD</Text>
-                )}
-              </Pressable>
-            </View>
-
-            <View style={styles.formCard}>
-              <Text style={styles.formTitle}>
-                Create Household Waste Bill
-              </Text>
-
-              <Text style={styles.label}>
-                Household Member / House Number
-              </Text>
-
-              <View style={styles.memberSelectBox}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={
-                    styles.memberSelectScroll
-                  }
-                >
-                  {members.map((member) => (
-                    <Pressable
-                      key={member.id}
-                      onPress={() => {
-                        if (member.user_id) {
-                          setWasteMemberId(
-                            member.user_id,
-                          );
-                          setWasteAccountNo(member.house_number || '');
-                        } else {
-                          Alert.alert(
-                            'Missing User ID',
-                            `${member.full_name} does not have a user ID yet.`,
-                          );
-                        }
-                      }}
-                      style={[
-                        styles.memberSelectChip,
-                        wasteMemberId ===
-                          member.user_id &&
-                          styles.memberSelectChipActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.memberSelectName,
-                          wasteMemberId ===
-                            member.user_id &&
-                            styles.memberSelectNameActive,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {member.full_name}
-                      </Text>
-
-                      <Text
-                        style={[
-                          styles.memberSelectEmail,
-                          wasteMemberId ===
-                            member.user_id &&
-                            styles.memberSelectEmailActive,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        House No. {member.house_number || 'Not assigned'}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
+              <View style={styles.memberPickerHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>SELECT MEMBERS</Text>
+                  <Text style={styles.selectedCount}>{selectedWasteMemberIds.length} member{selectedWasteMemberIds.length === 1 ? '' : 's'} selected • {selectedWasteHouseNumbers.length} household{selectedWasteHouseNumbers.length === 1 ? '' : 's'}</Text>
+                </View>
+                <Pressable onPress={toggleAllVisibleWasteMembers} style={styles.selectAllButton}>
+                  <Text style={styles.selectAllButtonText}>
+                    {filteredWasteMembers.length && filteredWasteMembers.every((member) => member.user_id && selectedWasteMemberIds.includes(member.user_id))
+                      ? 'CLEAR VISIBLE'
+                      : 'SELECT ALL VISIBLE'}
+                  </Text>
+                </Pressable>
               </View>
 
-              {wasteMemberId ? (
-                <View style={styles.selectedMemberCard}>
-                  <Text style={styles.selectedMemberLabel}>
-                    SELECTED MEMBER
-                  </Text>
+              <TextInput
+                value={wasteMemberSearch}
+                onChangeText={setWasteMemberSearch}
+                placeholder="Search member or House No."
+                placeholderTextColor="#999"
+                style={styles.input}
+              />
 
+              <ScrollView
+                style={styles.memberPickerList}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+              >
+                {filteredWasteMembers.map((member) => {
+                  const selected = Boolean(member.user_id && selectedWasteMemberIds.includes(member.user_id));
+                  return (
+                    <Pressable
+                      key={member.user_id}
+                      onPress={() => toggleWasteMemberSelection(member.user_id)}
+                      style={({ pressed }) => [
+                        styles.memberPickerItem,
+                        selected && styles.memberPickerItemSelected,
+                        pressed && { opacity: 0.82 },
+                      ]}
+                    >
+                      <View style={[styles.memberCheck, selected && styles.memberCheckSelected]}>
+                        <Text style={styles.memberCheckText}>{selected ? '✓' : ''}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.memberPickerName}>{member.full_name || 'Unnamed member'}</Text>
+                        <Text style={styles.memberPickerMeta}>House No. {member.house_number || 'Not assigned'}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+                {!filteredWasteMembers.length ? (
+                  <View style={styles.memberPickerEmpty}>
+                    <Text style={styles.memberPickerEmptyText}>No matching members.</Text>
+                  </View>
+                ) : null}
+              </ScrollView>
+
+              {selectedWasteMemberIds.length ? (
+                <View style={styles.selectedMemberCard}>
+                  <Text style={styles.selectedMemberLabel}>SELECTED MEMBERS</Text>
                   <Text style={styles.selectedMemberText}>
-                    {members.find(
-                      (member) =>
-                        member.user_id ===
-                        wasteMemberId,
-                    )?.full_name ||
-                      'Selected member'}
+                    {selectedWasteMembersSummary(members, selectedWasteMemberIds)}
                   </Text>
                 </View>
               ) : null}
-
-              <Text style={styles.label}>
-                HOUSE NUMBER (AUTO)
-              </Text>
-
-              <TextInput
-                value={wasteAccountNo}
-                editable={false}
-                placeholder="House No. 12"
-                placeholderTextColor="#999999"
-                style={styles.input}
-              />
 
               <Text style={styles.label}>
                 Bill Month
@@ -5691,7 +5632,9 @@ export default function AdminScreen() {
                   <ActivityIndicator color={WHITE} />
                 ) : (
                   <Text style={styles.primaryButtonText}>
-                    CREATE WASTE BILL
+                    {selectedWasteHouseNumbers.length
+                      ? `CREATE ${selectedWasteHouseNumbers.length} HOUSEHOLD WASTE BILL${selectedWasteHouseNumbers.length === 1 ? '' : 'S'}`
+                      : 'SELECT FAMILY MEMBER TO CREATE BILL'}
                   </Text>
                 )}
               </Pressable>
@@ -5860,7 +5803,7 @@ export default function AdminScreen() {
                 </Text>
 
                 <Text style={styles.sectionDescription}>
-                  Upload and manage Salem YMA newsletter issues.
+                  Upload and manage YMA Salem Branch newsletter issues.
                 </Text>
               </View>
             </View>
@@ -6046,7 +5989,7 @@ export default function AdminScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.sectionTitle}>Branch Leaders</Text>
                 <Text style={styles.sectionDescription}>
-                  Manage Salem YMA Branch hruaitu te
+                  Manage YMA Salem Branch hruaitu te
                 </Text>
               </View>
               <View style={styles.leaderCountBadge}>
@@ -6201,7 +6144,7 @@ export default function AdminScreen() {
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>No branch leaders yet</Text>
                 <Text style={styles.emptyText}>
-                  Add the first Salem YMA Branch leader above.
+                  Add the first YMA Salem Branch leader above.
                 </Text>
               </View>
             ) : (
@@ -8167,6 +8110,105 @@ const styles = StyleSheet.create({
     color: WHITE,
     fontSize: 25,
     fontWeight: '900',
+  },
+
+  selectedCount: {
+    color: MUTED,
+    fontSize: 10,
+    marginTop: 2,
+    fontWeight: '700',
+  },
+
+  selectAllButton: {
+    backgroundColor: '#FBEAEA',
+    borderWidth: 1,
+    borderColor: '#F2CACA',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+
+  selectAllButtonText: {
+    color: RED_DARK,
+    fontSize: 9,
+    fontWeight: '900',
+  },
+
+  memberPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+
+  memberPickerList: {
+    maxHeight: 260,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    backgroundColor: '#FAFAFA',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+
+  memberPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+    backgroundColor: WHITE,
+  },
+
+  memberPickerItemSelected: {
+    backgroundColor: '#FFF4F4',
+  },
+
+  memberCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: '#D5D5D5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    backgroundColor: WHITE,
+  },
+
+  memberCheckSelected: {
+    backgroundColor: RED,
+    borderColor: RED,
+  },
+
+  memberCheckText: {
+    color: WHITE,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+
+  memberPickerName: {
+    color: TEXT,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+
+  memberPickerMeta: {
+    color: MUTED,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  memberPickerEmpty: {
+    paddingVertical: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  memberPickerEmptyText: {
+    color: MUTED,
+    fontSize: 11,
   },
 
   memberSelectBox: {

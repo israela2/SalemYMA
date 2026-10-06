@@ -9,9 +9,9 @@ import {
 import { useEffect, useState } from 'react';
 
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 type ActivityItem = {
   id: number;
   title: string | null;
@@ -67,15 +67,10 @@ export default function ActivitiesScreen() {
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>‹ Back</Text>
-        </Pressable>
+        <AppBackButton />
 
         <Text style={styles.headerSmall}>
-          SALEM YMA
+          YMA Salem Branch
         </Text>
 
         <Text style={styles.headerTitle}>
@@ -83,7 +78,7 @@ export default function ActivitiesScreen() {
         </Text>
 
         <Text style={styles.headerText}>
-          Salem YMA activities and programmes
+          YMA Salem Branch activities and programmes
         </Text>
 
         <Pressable
@@ -115,7 +110,7 @@ export default function ActivitiesScreen() {
           </Text>
 
           <Text style={styles.messageText}>
-            Salem YMA hmalakna te load mek a ni.
+            YMA Salem Branch hmalakna te load mek a ni.
           </Text>
         </View>
       ) : activities.length === 0 ? (
@@ -132,7 +127,7 @@ export default function ActivitiesScreen() {
           </Text>
 
           <Text style={styles.messageText}>
-            Salem YMA hmalakna leh programme te
+            YMA Salem Branch hmalakna leh programme te
             hetah hian an lo lang ang.
           </Text>
         </View>

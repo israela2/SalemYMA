@@ -16,10 +16,10 @@ import {
   View,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import AppBackButton from '../components/AppBackButton';
 import { createYmaReceiptHtml } from '../utils/receipt-template';
 
-type WasteBill = {
+import AppBackButton from '../components/AppBackButton';
+type ChhiatniFundBill = {
   id: number;
   account_no: string | null;
   bill_month: string | null;
@@ -31,6 +31,8 @@ type WasteBill = {
   payment_method: string | null;
   payment_utr?: string | null;
   payment_submitted_at?: string | null;
+  householder_name?: string | null;
+  is_published?: boolean | null;
   created_at: string;
 };
 
@@ -51,20 +53,21 @@ type Member = {
 export default function WasteFeeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [bills, setBills] = useState<WasteBill[]>([]);
+  const [bills, setBills] = useState<ChhiatniFundBill[]>([]);
   const [member, setMember] = useState<Member | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
-  const [selectedBill, setSelectedBill] = useState<WasteBill | null>(null);
+  const [selectedBill, setSelectedBill] = useState<ChhiatniFundBill | null>(null);
   const [utr, setUtr] = useState('');
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [showPaymentQr, setShowPaymentQr] = useState(false);
+  const [householderName, setHouseholderName] = useState('');
 
   useEffect(() => {
-    loadWasteFee();
+    loadChhiatniFund();
   }, []);
 
-  async function loadWasteFee(isRefresh = false) {
+  async function loadChhiatniFund(isRefresh = false) {
     try {
       if (isRefresh) {
         setRefreshing(true);
@@ -94,7 +97,7 @@ export default function WasteFeeScreen() {
       console.log('Current logged-in user:', user.id);
 
       const { data: paymentConfig } = await supabase
-        .from('waste_payment_settings')
+        .from('chhiatni_fund_payment_settings')
         .select('upi_id, payee_name, instructions')
         .eq('id', 1)
         .maybeSingle();
@@ -112,20 +115,25 @@ export default function WasteFeeScreen() {
       }
 
       setMember(memberData ?? null);
+      setHouseholderName(memberData?.full_name?.trim() || '');
 
-      // Waste Fee is household-based: all members with the same House Number
-      // see the same ₹200/family bill.
+      // Chhiatni Fund is household-based. All registered members sharing the
+      // same House Number belong to the same family billing account. Therefore,
+      // a bill is created once per House Number and is visible to every family
+      // member in that household.
       const houseNumber = memberData?.house_number?.trim() || '';
-      let billQuery = supabase
-        .from('waste_bills')
-        .select(
-          'id, account_no, bill_month, amount, due_date, status, paid_at, receipt_no, payment_method, payment_utr, payment_submitted_at, created_at'
-        )
-        .order('created_at', { ascending: false });
+      if (!houseNumber) {
+        setBills([]);
+        return;
+      }
 
-      const { data: billData, error: billError } = houseNumber
-        ? await billQuery.eq('house_number', houseNumber)
-        : await billQuery.eq('user_id', user.id);
+      const { data: billData, error: billError } = await supabase
+        .from('chhiatni_fund_bills')
+        .select(
+          'id, account_no, bill_month, amount, due_date, status, paid_at, receipt_no, payment_method, payment_utr, payment_submitted_at, householder_name, is_published, created_at'
+        )
+        .eq('house_number', houseNumber)
+        .order('created_at', { ascending: false });
 
       if (billError) {
         console.log('Waste bill error:', billError);
@@ -135,7 +143,7 @@ export default function WasteFeeScreen() {
 
       console.log('Waste bills:', billData);
 
-      setBills((billData ?? []) as WasteBill[]);
+      setBills((billData ?? []) as ChhiatniFundBill[]);
     } catch (error) {
       console.log('Waste fee load error:', error);
       setBills([]);
@@ -150,7 +158,7 @@ export default function WasteFeeScreen() {
 
   async function handleRefresh() {
     if (refreshing) return;
-    await loadWasteFee(true);
+    await loadChhiatniFund(true);
   }
 
   function formatAmount(amount: number) {
@@ -200,9 +208,8 @@ export default function WasteFeeScreen() {
     return '#C62828';
   }
 
-  // Waste Fee is household-based: one bill belongs to one House Number.
-  // As soon as any family member submits payment, the bill is no longer shown
-  // as an active/unpaid bill to the whole household.
+  // Submitted payments are no longer shown as active/current bills to the member.
+  // They reappear in Payment History after admin verification/publish.
   const unpaidBills = bills.filter((bill) => {
     const status = (bill.status || '').toLowerCase();
     const paymentSubmitted = Boolean(bill.payment_submitted_at) || Boolean(bill.payment_utr);
@@ -215,7 +222,7 @@ export default function WasteFeeScreen() {
   });
 
   const paidBills = bills.filter(
-    (bill) => (bill.status || '').toLowerCase() === 'paid'
+    (bill) => (bill.status || '').toLowerCase() === 'paid' && bill.is_published !== false
   );
 
   const outstanding = unpaidBills.reduce(
@@ -226,18 +233,18 @@ export default function WasteFeeScreen() {
   const accountNo =
     bills.find((bill) => bill.account_no)?.account_no || 'YMA-0001';
 
-  function handlePayment(bill: WasteBill) {
+  function handlePayment(bill: ChhiatniFundBill) {
     setSelectedBill(bill);
     setUtr('');
     setShowPaymentQr(false);
   }
 
-  async function payWithUpi(bill: WasteBill) {
+  async function payWithUpi(bill: ChhiatniFundBill) {
     if (!paymentSettings?.upi_id) {
-      Alert.alert('UPI not configured', 'Admin has not configured the Waste Fee UPI ID yet.');
+      Alert.alert('UPI not configured', 'Admin has not configured the Chhiatni Fund UPI ID yet.');
       return;
     }
-    const upiUrl = `upi://pay?pa=${encodeURIComponent(paymentSettings.upi_id)}&pn=${encodeURIComponent(paymentSettings.payee_name || 'YMA Salem Branch')}&am=${encodeURIComponent(Number(bill.amount).toFixed(2))}&cu=INR&tn=${encodeURIComponent(`Waste Fee ${bill.bill_month || ''}`)}`;
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(paymentSettings.upi_id)}&pn=${encodeURIComponent(paymentSettings.payee_name || 'YMA Salem Branch')}&am=${encodeURIComponent(Number(bill.amount).toFixed(2))}&cu=INR&tn=${encodeURIComponent(`Chhiatni Fund Year ${bill.bill_month || ''}`)}`;
     try {
       const canOpen = await Linking.canOpenURL(upiUrl);
       if (!canOpen) throw new Error('No UPI app is available on this device.');
@@ -249,22 +256,27 @@ export default function WasteFeeScreen() {
 
   async function submitUtr() {
     if (!selectedBill || !userId) return;
+    if (!householderName.trim()) {
+      Alert.alert('House Holder Name Required', 'Please enter the name of the family house holder before submitting payment.');
+      return;
+    }
     if (utr.trim().length < 6) {
       Alert.alert('Enter UTR', 'Please enter the UTR / transaction ID from your UPI payment.');
       return;
     }
     try {
       setSubmittingPayment(true);
-      const { error } = await supabase.rpc('submit_waste_payment', {
+      const { error } = await supabase.rpc('submit_chhiatni_fund_payment', {
         p_bill_id: selectedBill.id,
         p_utr: utr.trim(),
+        p_householder_name: householderName.trim(),
       });
       if (error) throw error;
       Alert.alert('Payment submitted', 'Your UTR has been submitted. Admin will verify the payment and issue your receipt.');
       setSelectedBill(null);
       setUtr('');
       setShowPaymentQr(false);
-      await loadWasteFee();
+      await loadChhiatniFund();
     } catch (error: any) {
       Alert.alert('Submission failed', error?.message || 'Unable to submit payment.');
     } finally {
@@ -272,15 +284,15 @@ export default function WasteFeeScreen() {
     }
   }
 
-  async function printReceipt(bill: WasteBill) {
+  async function printReceipt(bill: ChhiatniFundBill) {
     const html = createYmaReceiptHtml({
-      title: 'Waste Collection Fee Receipt',
-      subtitle: 'Bawhhlawh Paih Man',
+      title: 'Chhiatni Fund Receipt',
+      subtitle: 'Annual Community Fund',
       receiptNo: bill.receipt_no || '-',
-      payerName: member?.full_name || 'YMA Salem Branch Member',
+      payerName: bill.householder_name || member?.full_name || 'House Holder',
       accountLabel: 'ACCOUNT NO.',
       accountValue: bill.account_no || accountNo,
-      periodLabel: 'BILL MONTH',
+      periodLabel: 'BILL YEAR',
       periodValue: bill.bill_month || '-',
       amount: Number(bill.amount || 0).toFixed(2),
       paymentMethod: bill.payment_method || 'UPI',
@@ -314,7 +326,7 @@ export default function WasteFeeScreen() {
     return (
       <View style={styles.loadingScreen}>
         <ActivityIndicator size="large" color="#C62828" />
-        <Text style={styles.loadingText}>Loading waste fee...</Text>
+        <Text style={styles.loadingText}>Loading chhiatni fund...</Text>
       </View>
     );
   }
@@ -331,9 +343,9 @@ export default function WasteFeeScreen() {
           <AppBackButton />
           <View style={{ flex: 1, marginLeft: 10 }}>
             <Text style={styles.headerSmall}>YMA Salem Branch</Text>
-            <Text style={styles.headerTitle}>Bawhhlawh Paih Man</Text>
+            <Text style={styles.headerTitle}>Chhiatni Fund</Text>
             <Text style={styles.headerSubtitle}>
-              Waste collection fee
+              Chhiatni Fund
             </Text>
           </View>
 
@@ -405,8 +417,11 @@ export default function WasteFeeScreen() {
             <Text style={styles.emptyTitle}>No outstanding bill</Text>
 
             <Text style={styles.emptyText}>
-              You currently have no unpaid waste collection fee.
+              You currently have no outstanding Chhiatni Fund bill.
             </Text>
+            {pendingBills.length ? (
+              <Text style={styles.emptyPendingText}>Payment submitted • waiting for admin verification.</Text>
+            ) : null}
           </View>
         ) : (
           <>
@@ -434,8 +449,8 @@ export default function WasteFeeScreen() {
               <View style={styles.billCard} key={bill.id}>
                 <View style={styles.billTop}>
                   <View>
-                    <Text style={styles.billMonth}>
-                      {bill.bill_month || 'Waste Collection Fee'}
+                    <Text style={styles.billYear}>
+                      {bill.bill_month || 'Chhiatni Fund'}
                     </Text>
 
                     <Text style={styles.billAccount}>
@@ -537,8 +552,8 @@ export default function WasteFeeScreen() {
                   </View>
 
                   <View style={styles.historyMain}>
-                    <Text style={styles.historyMonth}>
-                      {bill.bill_month || 'Waste Fee'}
+                    <Text style={styles.historyYear}>
+                      {bill.bill_month || 'Chhiatni Fund'}
                     </Text>
 
                     <Text style={styles.historyDate}>
@@ -583,7 +598,7 @@ export default function WasteFeeScreen() {
           </View>
 
           <Text style={styles.infoDescription}>
-            Waste collection fees help support regular waste
+            Chhiatni Funds help support yearly chhiatni
             collection and maintain a clean community environment.
           </Text>
 
@@ -609,8 +624,17 @@ export default function WasteFeeScreen() {
       {selectedBill ? (
         <View style={styles.paymentOverlay}>
           <View style={styles.paymentModal}>
-            <Text style={styles.paymentModalTitle}>Complete Waste Fee Payment</Text>
+            <Text style={styles.paymentModalTitle}>Complete Chhiatni Fund Payment</Text>
             <Text style={styles.paymentModalAmount}>₹{Number(selectedBill.amount).toFixed(2)}</Text>
+            <Text style={styles.paymentModalLabel}>FAMILY HOUSE HOLDER NAME *</Text>
+            <TextInput
+              value={householderName}
+              onChangeText={setHouseholderName}
+              placeholder={member?.full_name || 'Enter house holder name'}
+              placeholderTextColor="#999"
+              style={styles.householderInput}
+              autoCapitalize="words"
+            />
             <View style={styles.paymentChoiceRow}>
               <Pressable onPress={() => payWithUpi(selectedBill)} style={styles.paymentChoicePrimary}>
                 <Text style={styles.paymentChoicePrimaryText}>Pay with UPI</Text>
@@ -623,7 +647,7 @@ export default function WasteFeeScreen() {
               <View style={styles.qrCard}>
                 <Text style={styles.paymentModalLabel}>SCAN TO PAY</Text>
                 <Text style={styles.paymentModalUpi}>{paymentSettings?.upi_id || '-'}</Text>
-                {paymentSettings?.upi_id ? <Image source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`upi://pay?pa=${paymentSettings.upi_id}&pn=${paymentSettings.payee_name || 'YMA Salem Branch'}&am=${Number(selectedBill.amount).toFixed(2)}&cu=INR&tn=Waste%20Fee`)}` }} style={styles.paymentQr} /> : null}
+                {paymentSettings?.upi_id ? <Image source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`upi://pay?pa=${paymentSettings.upi_id}&pn=${paymentSettings.payee_name || 'YMA Salem Branch'}&am=${Number(selectedBill.amount).toFixed(2)}&cu=INR&tn=Chhiatni%20Fund%20Year`)}` }} style={styles.paymentQr} /> : null}
               </View>
             ) : null}
             <Text style={styles.paymentModalHint}>{paymentSettings?.instructions || 'Choose a payment option above. After successful payment, enter the UTR / transaction ID from the payment confirmation.'}</Text>
@@ -910,7 +934,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
 
-  billMonth: {
+  billYear: {
     color: '#111111',
     fontSize: 15,
     fontWeight: '900',
@@ -1025,6 +1049,14 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 
+  emptyPendingText: {
+    color: '#F57C00',
+    fontSize: 10,
+    fontWeight: '800',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+
   emptyText: {
     color: '#888888',
     fontSize: 11,
@@ -1067,7 +1099,7 @@ const styles = StyleSheet.create({
     marginLeft: 11,
   },
 
-  historyMonth: {
+  historyYear: {
     color: '#111111',
     fontSize: 13,
     fontWeight: '900',
@@ -1223,6 +1255,18 @@ const styles = StyleSheet.create({
   paymentModalLabel: { fontSize: 11, fontWeight: '800', color: '#777', marginTop: 18 },
   paymentModalUpi: { fontSize: 16, fontWeight: '800', color: '#151515', marginTop: 4 },
   paymentModalHint: { fontSize: 13, lineHeight: 19, color: '#666', marginTop: 12 },
+  householderInput: {
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    color: '#151515',
+    backgroundColor: '#FAFAFA',
+    fontSize: 13,
+    marginBottom: 12,
+  },
+
   utrInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, marginTop: 16, fontSize: 15, color: '#111' },
   submitPaymentButton: { backgroundColor: '#C62828', borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
   submitPaymentText: { color: '#fff', fontSize: 13, fontWeight: '900' },

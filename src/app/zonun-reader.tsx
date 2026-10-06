@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { WebView } from 'react-native-webview';
 
+import AppBackButton from '../components/AppBackButton';
 export default function ZonunReader() {
   const { url } = useLocalSearchParams();
   const pdfUrl = String(url || '');
@@ -21,9 +22,7 @@ export default function ZonunReader() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient colors={['#D32F2F', '#8E1B1B', '#111111']} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
+        <AppBackButton />
         <Text style={styles.title}>Zonun PDF</Text>
       </LinearGradient>
 

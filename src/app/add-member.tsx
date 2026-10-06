@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 const sections = [
   'Section - I',
   'Section - II',
@@ -31,7 +32,7 @@ export default function AddMemberScreen() {
   const [gender, setGender] = useState('');
   const [email, setEmail] = useState('');
   const [section, setSection] = useState('');
-  const [branch, setBranch] = useState('Salem YMA Branch');
+  const [branch, setBranch] = useState('YMA Salem Branch');
   const [houseNumber, setHouseNumber] = useState('');
   const [status, setStatus] = useState('Active');
 
@@ -83,7 +84,7 @@ export default function AddMemberScreen() {
         email: cleanEmail || null,
         section,
         house_number: cleanHouseNumber,
-        branch_name: cleanBranch || 'Salem YMA Branch',
+        branch_name: cleanBranch || 'YMA Salem Branch',
         status,
       });
 
@@ -115,17 +116,10 @@ export default function AddMemberScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
-          <Pressable
-            onPress={() => router.replace('/admin')}
-            style={styles.backCircle}
-          >
-            <Text style={styles.backIcon}>
-              ‹
-            </Text>
-          </Pressable>
+          <AppBackButton onPress={() => router.replace('/admin')} />
 
           <Text style={styles.eyebrow}>
-            SALEM YMA
+            YMA Salem Branch
           </Text>
 
           <Text style={styles.headerTitle}>
@@ -384,7 +378,7 @@ export default function AddMemberScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerTitle}>
-            SALEM YMA
+            YMA Salem Branch
           </Text>
 
           <Text style={styles.footerText}>

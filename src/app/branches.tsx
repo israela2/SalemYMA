@@ -1,10 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Linking,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -17,6 +17,7 @@ import { WebView } from 'react-native-webview';
 
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 type BranchLeader = {
   id: number;
   position: string;
@@ -100,6 +101,7 @@ export default function BranchesScreen() {
   const [selectedSection, setSelectedSection] = useState('Section I');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<{ uri: string; name: string; role: string } | null>(null);
 
   useEffect(() => {
     loadBranchLeaders();
@@ -129,7 +131,7 @@ export default function BranchesScreen() {
               supabase
           .from('members')
           .select('gender, status, branch_name')
-          .eq('branch_name', 'Salem YMA Branch'),
+          .in('branch_name', ['Salem YMA Branch', 'YMA Salem Branch']),
       ]);
 
       if (branchResult.error) {
@@ -249,13 +251,26 @@ export default function BranchesScreen() {
       <View style={styles.leaderCard}>
         <View style={styles.photoWrapper}>
           {leader?.photo_url ? (
-            <Image
-              source={{
-                uri: leader.photo_url,
-              }}
-              style={styles.leaderPhoto}
-              resizeMode="cover"
-            />
+            <Pressable
+              style={styles.photoPressable}
+              onPress={() =>
+                setSelectedPhoto({
+                  uri: leader.photo_url!,
+                  name: leader.full_name?.trim() || 'Branch Leader',
+                  role: position,
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`View full photo of ${leader.full_name || position}`}
+            >
+              <Image
+                source={{
+                  uri: leader.photo_url,
+                }}
+                style={styles.leaderPhoto}
+                resizeMode="cover"
+              />
+            </Pressable>
           ) : (
             <View style={styles.photoPlaceholder}>
               <Text
@@ -319,13 +334,26 @@ export default function BranchesScreen() {
       <View style={styles.sectionLeaderCard}>
         <View style={styles.photoWrapper}>
           {leader.photo_url ? (
-            <Image
-              source={{
-                uri: leader.photo_url,
-              }}
-              style={styles.leaderPhoto}
-              resizeMode="cover"
-            />
+            <Pressable
+              style={styles.photoPressable}
+              onPress={() =>
+                setSelectedPhoto({
+                  uri: leader.photo_url!,
+                  name: leader.full_name?.trim() || 'Section Leader',
+                  role: leader.position,
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`View full photo of ${leader.full_name || leader.position}`}
+            >
+              <Image
+                source={{
+                  uri: leader.photo_url,
+                }}
+                style={styles.leaderPhoto}
+                resizeMode="cover"
+              />
+            </Pressable>
           ) : (
             <View style={styles.photoPlaceholder}>
               <Text
@@ -416,62 +444,44 @@ export default function BranchesScreen() {
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text
-            style={styles.backButtonText}
-          >
-            ‹ Back
-          </Text>
-        </Pressable>
+        <AppBackButton />
 
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.headerSmall}>
-              SALEM YMA
-            </Text>
+  
 
             <Text style={styles.headerTitle}>
               Branch Information
             </Text>
 
             <Text style={styles.headerText}>
-              Salem YMA Branch
+              YMA Salem Branch
             </Text>
           </View>
 
           <View style={styles.headerIcon}>
-            <Text
-              style={styles.headerIconText}
-            >
-              SY
-            </Text>
+            <Image
+              source={require('../assets/yma-logo.png')}
+              style={styles.headerLogoImage}
+              resizeMode="contain"
+            />
           </View>
         </View>
       </LinearGradient>
 
       {/* Branch Overview */}
       <View style={styles.branchCard}>
-        <LinearGradient
-          colors={[
-            '#D32F2F',
-            '#8E1B1B',
-            '#0B0B0B',
-          ]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.logoCircle}
-        >
-          <Text style={styles.logoText}>
-            SY
-          </Text>
-        </LinearGradient>
+        <View style={styles.logoCircle}>
+          <Image
+            source={require('../assets/yma-logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        </View>
 
         <View style={styles.branchInfo}>
           <Text style={styles.branchName}>
-            Salem YMA Branch
+            YMA Salem Branch
           </Text>
 
           <Text style={styles.location}>
@@ -488,7 +498,7 @@ export default function BranchesScreen() {
 
       {/* Branch Members */}
       <View style={styles.memberStatsCard}>
-        <Text style={styles.memberStatsEyebrow}>YMA SALEM BRANCH MEMBER</Text>
+        <Text style={styles.memberStatsEyebrow}>YMA Salem Branch MEMBER</Text>
         <Text style={styles.memberStatsTitle}>TOTAL MEMBERS</Text>
         <Text style={styles.memberTotal}>{memberStats.total}</Text>
 
@@ -512,7 +522,7 @@ export default function BranchesScreen() {
           </Text>
 
           <Text style={styles.sectionSubtitle}>
-            Salem YMA Branch Leadership
+            YMA Salem Branch Leadership
           </Text>
         </View>
 
@@ -722,7 +732,7 @@ export default function BranchesScreen() {
 
         <View style={styles.infoContent}>
           <Text style={styles.infoTitle}>
-            Salem YMA Activities
+            YMA Salem Branch Activities
           </Text>
 
           <Text style={styles.infoText}>
@@ -776,7 +786,7 @@ export default function BranchesScreen() {
             style={styles.mapHeaderContent}
           >
             <Text style={styles.mapTitle}>
-              Salem YMA Branch Location
+              YMA Salem Branch Location
             </Text>
 
             <Text
@@ -790,7 +800,7 @@ export default function BranchesScreen() {
         <View style={styles.mapWrapper}>
           {Platform.OS === 'web' ? (
             <iframe
-              title="Salem YMA Branch Location"
+              title="YMA Salem Branch Location"
               src={branchMapUrl}
               style={styles.webMap as any}
               loading="lazy"
@@ -842,7 +852,7 @@ export default function BranchesScreen() {
           </Text>
 
           <Text style={styles.contactText}>
-            Salem YMA Branch contact
+            YMA Salem Branch contact
             information will be updated
             through the admin system.
           </Text>
@@ -872,7 +882,7 @@ export default function BranchesScreen() {
       {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerTitle}>
-          SALEM YMA
+          YMA Salem Branch
         </Text>
 
         <Text
@@ -883,6 +893,61 @@ export default function BranchesScreen() {
       </View>
 
       <View style={{ height: 25 }} />
+
+      <Modal
+        visible={!!selectedPhoto}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedPhoto(null)}
+      >
+        <View style={styles.photoPreviewOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setSelectedPhoto(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Close photo preview"
+          />
+
+          <View style={styles.photoPreviewCard}>
+            <View style={styles.photoPreviewHeader}>
+              <View style={styles.photoPreviewTitleWrap}>
+                <Text style={styles.photoPreviewRole}>
+                  {selectedPhoto?.role?.toUpperCase() || 'LEADER'}
+                </Text>
+                <Text style={styles.photoPreviewName} numberOfLines={2}>
+                  {selectedPhoto?.name || ''}
+                </Text>
+              </View>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.photoPreviewClose,
+                  pressed && styles.pressed,
+                ]}
+                onPress={() => setSelectedPhoto(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Text style={styles.photoPreviewCloseText}>×</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.photoPreviewImageWrap}>
+              {selectedPhoto?.uri ? (
+                <Image
+                  source={{ uri: selectedPhoto.uri }}
+                  style={styles.photoPreviewImage}
+                  resizeMode="contain"
+                />
+              ) : null}
+            </View>
+
+            <Text style={styles.photoPreviewHint}>
+              Tap outside or × to close
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -962,6 +1027,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+
+  headerLogoImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
 
   memberStatsCard: {
@@ -1052,6 +1123,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '900',
+  },
+
+  logoImage: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
   },
 
   branchInfo: {
@@ -1223,6 +1300,10 @@ const styles = StyleSheet.create({
     borderColor: '#F2CACA',
   },
 
+  photoPressable: {
+    flex: 1,
+  },
+
   leaderPhoto: {
     width: '100%',
     height: '100%',
@@ -1288,6 +1369,95 @@ const styles = StyleSheet.create({
 
   pressed: {
     opacity: 0.7,
+  },
+
+  photoPreviewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.86)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+  },
+
+  photoPreviewCard: {
+    width: '100%',
+    maxWidth: 520,
+    maxHeight: '92%',
+    borderRadius: 22,
+    backgroundColor: '#111111',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+
+  photoPreviewHeader: {
+    minHeight: 72,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.10)',
+  },
+
+  photoPreviewTitleWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+
+  photoPreviewRole: {
+    color: '#FFB4B4',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+
+  photoPreviewName: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: 3,
+  },
+
+  photoPreviewClose: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+
+  photoPreviewCloseText: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    lineHeight: 28,
+    fontWeight: '300',
+  },
+
+  photoPreviewImageWrap: {
+    width: '100%',
+    aspectRatio: 1,
+    maxHeight: 560,
+    backgroundColor: '#0A0A0A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  photoPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  photoPreviewHint: {
+    textAlign: 'center',
+    color: '#AAAAAA',
+    fontSize: 10,
+    paddingTop: 9,
+    paddingBottom: 11,
   },
 
   /* SECTION TABS */

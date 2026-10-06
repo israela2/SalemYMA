@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { supabase } from '../lib/supabase';
 
+import AppBackButton from '../components/AppBackButton';
 type Member = {
   full_name: string | null;
   phone: string | null;
@@ -324,7 +325,7 @@ export default function ProfileScreen() {
 
   const fullName =
     member?.full_name ||
-    'Salem YMA Member';
+    'YMA Salem Branch Member';
 
   const section =
     member?.section ||
@@ -336,7 +337,7 @@ export default function ProfileScreen() {
 
   const branch =
     member?.branch_name ||
-    'Salem YMA Branch';
+    'YMA Salem Branch';
 
   const houseNumber =
     member?.house_number ||
@@ -378,20 +379,13 @@ export default function ProfileScreen() {
         style={styles.header}
       >
         <View style={styles.headerTop}>
-          <Pressable
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backIcon}>
-              ‹
-            </Text>
-          </Pressable>
+          <AppBackButton />
 
           <View
             style={styles.headerLogoBox}
           >
             <Image
-              source={require('../../assets/images/yma-logo.png')}
+              source={require('../assets/yma-logo.png')}
               style={styles.headerLogo}
               resizeMode="contain"
             />
@@ -399,7 +393,7 @@ export default function ProfileScreen() {
         </View>
 
         <Text style={styles.headerEyebrow}>
-          YMA SALEM BRANCH
+          YMA Salem Branch
         </Text>
 
         <Text style={styles.headerTitle}>
@@ -407,7 +401,7 @@ export default function ProfileScreen() {
         </Text>
 
         <Text style={styles.headerText}>
-          Your Salem YMA member information
+          Your YMA Salem Branch member information
         </Text>
       </LinearGradient>
 
@@ -433,7 +427,7 @@ export default function ProfileScreen() {
                   ? {
                       uri: profilePhoto,
                     }
-                  : require('../../assets/images/yma-logo.png')
+                  : require('../assets/yma-logo.png')
               }
               style={
                 profilePhoto
@@ -711,7 +705,7 @@ export default function ProfileScreen() {
               <Text
                 style={styles.accountSubtitle}
               >
-                Salem YMA Member Database
+                YMA Salem Branch Member Database
               </Text>
             </View>
           </View>
@@ -720,9 +714,9 @@ export default function ProfileScreen() {
             style={styles.accountDescription}
           >
             Your profile is connected to
-            your Salem YMA account. Member
+            your YMA Salem Branch account. Member
             information shown here is
-            loaded from the Salem YMA
+            loaded from the YMA Salem Branch
             database.
           </Text>
         </LinearGradient>
@@ -732,14 +726,14 @@ export default function ProfileScreen() {
       <View style={styles.footerCard}>
         <View style={styles.footerLogoBox}>
           <Image
-            source={require('../../assets/images/yma-logo.png')}
+            source={require('../assets/yma-logo.png')}
             style={styles.footerLogo}
             resizeMode="contain"
           />
         </View>
 
         <Text style={styles.footerTitle}>
-          YMA SALEM BRANCH
+          YMA Salem Branch
         </Text>
 
         <Text
