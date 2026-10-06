@@ -35,6 +35,7 @@ type Member = {
   house_number?: string | null;
   status?: string | null;
   created_at?: string | null;
+  admin_role?: 'full_admin' | 'cemetery_admin' | null;
 };
 
 type GalleryAlbum = {
@@ -1436,6 +1437,7 @@ export default function AdminScreen() {
        */
       const [
         membersResult,
+        approvedAdminsResult,
         galleryResult,
         newsResult,
         eventsResult,
@@ -1452,6 +1454,15 @@ export default function AdminScreen() {
           .order('created_at', {
             ascending: false,
           }),
+
+        // Approved administrators are YMA members too. Merge them into the
+        // same Member List using user_id so an admin who already has a member
+        // row is shown only once.
+        supabase
+          .from('admins')
+          .select('user_id, role, status, created_at')
+          .eq('status', 'approved')
+          .in('role', ['full_admin', 'cemetery_admin']),
 
         supabase
           .from('gallery')
@@ -1519,9 +1530,68 @@ export default function AdminScreen() {
       if (generation !== loadGeneration.current) return;
 
       if (!membersResult.error) {
-        setMembers(
-          membersResult.data || [],
+        const memberRows = (membersResult.data || []) as Member[];
+        const mergedMembers = new Map<string, Member>();
+        const standaloneMembers: Member[] = [];
+
+        memberRows.forEach((member) => {
+          if (member.user_id) {
+            mergedMembers.set(String(member.user_id), member);
+          } else {
+            standaloneMembers.push(member);
+          }
+        });
+
+        // IMPORTANT: Approved administrators are members too.
+        // Build the exact same merged directory that the Member List displays.
+        // This guarantees the number shown in Members Management is also the
+        // number represented by the member directory: normal members + admins,
+        // with an existing admin/member user_id counted only once.
+        if (approvedAdminsResult.error) {
+          console.log('Approved admin member load error:', approvedAdminsResult.error.message);
+        }
+
+        (approvedAdminsResult.data || []).forEach((admin: any, index: number) => {
+          if (!admin.user_id) return;
+          const userId = String(admin.user_id);
+          const existing = mergedMembers.get(userId);
+
+          if (existing) {
+            mergedMembers.set(userId, {
+              ...existing,
+              admin_role: admin.role,
+            });
+            return;
+          }
+
+          const isFullAdmin = admin.role === 'full_admin';
+          mergedMembers.set(userId, {
+            id: -(index + 1),
+            user_id: userId,
+            full_name: isFullAdmin ? 'Full Access Admin' : 'Cemetery Admin',
+            email: null,
+            phone: null,
+            branch_name: 'YMA Salem Branch',
+            section: null,
+            house_number: null,
+            status: 'Active',
+            created_at: admin.created_at || null,
+            admin_role: admin.role,
+          });
+        });
+
+        // This is the SINGLE source used by the Admin Member List.
+        const mergedMemberList = [
+          ...standaloneMembers,
+          ...Array.from(mergedMembers.values()),
+        ];
+        setMembers(mergedMemberList);
+        console.log(
+          `Member directory loaded: ${mergedMemberList.length} total (${memberRows.length} member rows + ${(approvedAdminsResult.data || []).length} approved admins, de-duplicated by user_id).`,
         );
+      } else {
+        console.log('Members load error:', membersResult.error?.message);
+        setMembers([]);
       }
 
       if (!galleryResult.error) {
@@ -4399,6 +4469,13 @@ export default function AdminScreen() {
                   <View
                     style={styles.memberTags}
                   >
+                    {member.admin_role && (
+                      <View style={[styles.tag, styles.adminMemberTag]}>
+                        <Text style={[styles.tagText, styles.adminMemberTagText]}>
+                          {member.admin_role === 'full_admin' ? 'FULL ADMIN' : 'CEMETERY ADMIN'}
+                        </Text>
+                      </View>
+                    )}
                     <View
                       style={styles.tag}
                     >
@@ -4436,17 +4513,19 @@ export default function AdminScreen() {
 
                 <Pressable
                   style={styles.arrowButton}
-                  onPress={() =>
+                  onPress={() => {
+                    if (member.id < 0) {
+                      Alert.alert(
+                        member.admin_role === 'full_admin' ? 'Full Access Admin' : 'Cemetery Admin',
+                        'This administrator is an approved YMA member account. Complete member profile details can be added from the administrator profile.',
+                      );
+                      return;
+                    }
                     router.push({
-                      pathname:
-                        '/member-detail',
-                      params: {
-                        id: String(
-                          member.id,
-                        ),
-                      },
-                    })
-                  }
+                      pathname: '/member-detail',
+                      params: { id: String(member.id) },
+                    });
+                  }}
                 >
                   <Text
                     style={styles.arrowText}
@@ -7674,6 +7753,15 @@ const styles = StyleSheet.create({
 
   inactiveTag: {
     backgroundColor: '#EEEEEE',
+  },
+
+  adminMemberTag: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FFB74D',
+    borderWidth: 1,
+  },
+  adminMemberTagText: {
+    color: '#E65100',
   },
 
   inactiveTagText: {

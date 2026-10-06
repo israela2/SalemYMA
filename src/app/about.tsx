@@ -21,9 +21,11 @@ export default function AboutScreen() {
   }, []);
 
   async function loadAboutData() {
-    const [aboutResult, memberResult] = await Promise.all([
+    const [aboutResult, memberResult, adminResult] = await Promise.all([
       supabase.from('branch_info').select('about_content').eq('id', 1).maybeSingle(),
-      supabase.from('members').select('gender, status, branch_name').in('branch_name', ['Salem YMA Branch', 'YMA Salem Branch']),
+      supabase.from('members').select('user_id, gender, status, branch_name').in('branch_name', ['Salem YMA Branch', 'YMA Salem Branch']),
+      // Approved Full Admins and Cemetery Admins are also YMA members.
+      supabase.from('admins').select('user_id').eq('status', 'approved').in('role', ['full_admin', 'cemetery_admin']),
     ]);
 
     if (aboutResult.data?.about_content) setAboutText(aboutResult.data.about_content);
@@ -32,10 +34,31 @@ export default function AboutScreen() {
       const activeMembers = (memberResult.data ?? []).filter(
         (member: any) => (member.status ?? 'Active') === 'Active'
       );
+
+      const memberByUserId = new Map<string, any>();
+      activeMembers.forEach((member: any) => {
+        if (member.user_id) memberByUserId.set(member.user_id, member);
+        else memberByUserId.set(`member-${member.id ?? member.full_name}-${member.phone ?? ''}`, member);
+      });
+
+      // Admin accounts are members too. Avoid double-counting an admin
+      // when a corresponding members row already exists.
+      (adminResult.data ?? []).forEach((admin: any) => {
+        if (admin.user_id && !memberByUserId.has(admin.user_id)) {
+          memberByUserId.set(admin.user_id, {
+            user_id: admin.user_id,
+            gender: null,
+            status: 'Active',
+          });
+        }
+      });
+
+      // Same rule as Admin Panel Member List: members + approved admins, de-duplicated by user_id.
+      const allMembers = Array.from(memberByUserId.values());
       setMemberStats({
-        total: activeMembers.length,
-        mipa: activeMembers.filter((member: any) => member.gender === 'Mipa').length,
-        hmeichhia: activeMembers.filter((member: any) => member.gender === 'Hmeichhia').length,
+        total: allMembers.length,
+        mipa: allMembers.filter((member: any) => member.gender === 'Mipa').length,
+        hmeichhia: allMembers.filter((member: any) => member.gender === 'Hmeichhia').length,
       });
     }
   }

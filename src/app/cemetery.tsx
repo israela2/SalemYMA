@@ -15,6 +15,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import AppBackButton from '../components/AppBackButton';
@@ -93,6 +94,8 @@ function normalizeCategory(value?: string | null): RegisterCategory | null {
 }
 
 export default function CemeteryScreen() {
+  const { width: screenWidth } = useWindowDimensions();
+  const isCompactHeader = screenWidth < 600;
   const [records, setRecords] = useState<CemeteryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -370,17 +373,17 @@ export default function CemeteryScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient colors={[BLACK, RED_DARK]} style={styles.header}>
-        <View style={styles.headerInner}>
+        <View style={[styles.headerInner, isCompactHeader && styles.headerInnerCompact]}>
           <View style={styles.headerLeft}>
             <AppBackButton />
             <Image source={require('../assets/yma-logo.png')} style={styles.headerLogo} resizeMode="contain" />
             <View style={styles.headerTextWrap}>
               <Text style={styles.headerEyebrow}>YMA Salem Branch</Text>
-              <Text style={styles.headerTitle}>Thlanmual Record</Text>
+              <Text style={[styles.headerTitle, isCompactHeader && styles.headerTitleCompact]} numberOfLines={1}>Thlanmual Record</Text>
               <Text style={styles.headerSubtitle}>Cemetery Records</Text>
             </View>
           </View>
-          <View style={styles.totalRecordsPill}>
+          <View style={[styles.totalRecordsPill, isCompactHeader && styles.totalRecordsPillCompact]}>
             <Text style={styles.totalRecordsLabel}>Total Records</Text>
             <Text style={styles.totalRecordsValue}>{records.length}</Text>
           </View>
@@ -612,6 +615,7 @@ const styles = StyleSheet.create({
   totalRecordsPill: { minWidth: 132, minHeight: 52, paddingHorizontal: 15, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
   totalRecordsLabel: { color: '#DCE5EF', fontSize: 10, fontWeight: '700', letterSpacing: 0.2 },
   totalRecordsValue: { color: WHITE, fontSize: 22, fontWeight: '900', marginTop: 1 },
+  totalRecordsPillCompact: { alignSelf: 'flex-end', minWidth: 112, minHeight: 46, borderRadius: 23, paddingHorizontal: 12 },
 
   header: {
     paddingTop: Platform.OS === 'web' ? 18 : 58,
@@ -626,12 +630,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
-  headerLogo: { width: 50, height: 50, marginRight: 12 },
-  headerTextWrap: { flex: 1, minWidth: 0 },
-  headerEyebrow: { color: '#FFDADA', fontSize: 10, fontWeight: '900', letterSpacing: 1.8, marginBottom: 3 },
-  headerTitle: { color: WHITE, fontSize: 24, fontWeight: '900', lineHeight: 28 },
-  headerSubtitle: { color: '#E7E7E7', fontSize: 12, fontWeight: '600', marginTop: 3 },
+  headerInnerCompact: { flexDirection: 'column', alignItems: 'stretch', gap: 10 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, paddingRight: 10 },
+  headerLogo: { width: 46, height: 46, marginRight: 10 },
+  headerTextWrap: { flex: 1, minWidth: 0, overflow: 'hidden' },
+  headerEyebrow: { color: '#FFDADA', fontSize: 9, fontWeight: '900', letterSpacing: 1.5, marginBottom: 2 },
+  headerTitle: { color: WHITE, fontSize: 21, fontWeight: '900', lineHeight: 25 },
+  headerTitleCompact: { fontSize: 19, lineHeight: 23, flexShrink: 0 },
+  headerSubtitle: { color: '#E7E7E7', fontSize: 11, fontWeight: '600', marginTop: 2 },
 
   body: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 30 },

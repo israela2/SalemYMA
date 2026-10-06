@@ -111,7 +111,7 @@ export default function BranchesScreen() {
     try {
       setLoading(true);
 
-      const [branchResult, sectionResult, memberResult] = await Promise.all([
+      const [branchResult, sectionResult, memberResult, adminResult] = await Promise.all([
         supabase
           .from('branch_leaders')
           .select(
@@ -130,8 +130,17 @@ export default function BranchesScreen() {
           .order('display_order', { ascending: true }),
               supabase
           .from('members')
-          .select('gender, status, branch_name')
+          .select('user_id, gender, status, branch_name')
           .in('branch_name', ['Salem YMA Branch', 'YMA Salem Branch']),
+
+        // Approved Full Admins and Cemetery Admins are also YMA members.
+        // Use user_id to avoid counting an admin twice if they already have
+        // a row in members.
+        supabase
+          .from('admins')
+          .select('user_id')
+          .eq('status', 'approved')
+          .in('role', ['full_admin', 'cemetery_admin']),
       ]);
 
       if (branchResult.error) {
@@ -153,10 +162,31 @@ export default function BranchesScreen() {
         const activeMembers = (memberResult.data ?? []).filter(
           (member: any) => (member.status ?? 'Active') === 'Active'
         );
+
+        const memberByUserId = new Map<string, any>();
+        activeMembers.forEach((member: any) => {
+          if (member.user_id) memberByUserId.set(member.user_id, member);
+          else memberByUserId.set(`member-${member.id ?? member.full_name}-${member.phone ?? ''}`, member);
+        });
+
+        // Admin accounts are members too. If an admin already has a members
+        // row, the Map prevents double-counting.
+        (adminResult.data ?? []).forEach((admin: any) => {
+          if (admin.user_id && !memberByUserId.has(admin.user_id)) {
+            memberByUserId.set(admin.user_id, {
+              user_id: admin.user_id,
+              gender: null,
+              status: 'Active',
+            });
+          }
+        });
+
+        // Same rule as Admin Panel Member List: members + approved admins, de-duplicated by user_id.
+      const allMembers = Array.from(memberByUserId.values());
         setMemberStats({
-          total: activeMembers.length,
-          mipa: activeMembers.filter((member: any) => member.gender === 'Mipa').length,
-          hmeichhia: activeMembers.filter((member: any) => member.gender === 'Hmeichhia').length,
+          total: allMembers.length,
+          mipa: allMembers.filter((member: any) => member.gender === 'Mipa').length,
+          hmeichhia: allMembers.filter((member: any) => member.gender === 'Hmeichhia').length,
         });
       }
 

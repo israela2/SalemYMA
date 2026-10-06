@@ -11,6 +11,7 @@ import {
     Text,
     TextInput,
     View,
+    Modal,
 } from 'react-native';
 
 import { supabase } from '../lib/supabase';
@@ -19,17 +20,45 @@ import AppBackButton from '../components/AppBackButton';
 type AdminRole = 'full_admin' | 'cemetery_admin';
 
 export default function AdminSignUpScreen() {
+  const [fullName, setFullName] = useState('');
+  const [section, setSection] = useState('');
+  const [houseNumber, setHouseNumber] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<AdminRole>('cemetery_admin');
   const [saving, setSaving] = useState(false);
+  const [housePickerOpen, setHousePickerOpen] = useState(false);
+  const [houseSearch, setHouseSearch] = useState('');
+  const [houseBlock, setHouseBlock] = useState('A');
+
+  const sections = ['Section I', 'Section II', 'Section III'];
+
+  // House numbers are selected from the approved ward numbering scheme.
+  // House-number tabs: A1–A200, B1–B200, C1–C300.
+  const houseBlocks = [
+    { key: 'A', max: 200 },
+    { key: 'B', max: 200 },
+    { key: 'C', max: 300 },
+  ];
+  const selectedBlock = houseBlocks.find((b) => b.key === houseBlock) || houseBlocks[0];
+  const houseOptions = Array.from({ length: selectedBlock.max }, (_, i) => `${selectedBlock.key}${i + 1}`)
+    .filter((item) => !houseSearch.trim() || item.toLowerCase().includes(houseSearch.trim().toLowerCase()));
+
+  function chooseHouseNumber(value: string) {
+    setHouseNumber(value);
+    setHousePickerOpen(false);
+    setHouseSearch('');
+  }
 
   async function submit() {
+    const cleanName = fullName.trim();
+    const cleanSection = section.trim();
+    const cleanHouseNumber = houseNumber.trim();
     const cleanEmail = email.trim().toLowerCase();
 
-    if (!cleanEmail || !password || !confirmPassword) {
-      Alert.alert('Missing information', 'Please fill in all fields.');
+    if (!cleanName || !cleanSection || !cleanHouseNumber || !cleanEmail || !password || !confirmPassword) {
+      Alert.alert('Missing information', 'Please fill in Name, Section, House Number, Email and Password fields.');
       return;
     }
 
@@ -53,6 +82,10 @@ export default function AdminSignUpScreen() {
           data: {
             admin_signup: true,
             admin_role: role,
+            full_name: cleanName,
+            name: cleanName,
+            section: cleanSection,
+            house_number: cleanHouseNumber,
           },
         },
       });
@@ -63,8 +96,23 @@ export default function AdminSignUpScreen() {
         throw new Error('Unable to create the account.');
       }
 
-      // A database trigger creates the pending admin row from the sign-up metadata.
-      // This also works when Supabase requires email confirmation and returns no session.
+      // Keep every approved admin in the same Member directory as normal members.
+      // The signup metadata is also retained for the admin/profile flow.
+      // This insert follows the same member-registration pattern used by normal sign-up.
+      const { error: memberError } = await supabase.from('members').insert({
+        user_id: data.user.id,
+        full_name: cleanName,
+        email: cleanEmail,
+        section: cleanSection,
+        house_number: cleanHouseNumber,
+        branch_name: 'YMA Salem Branch',
+        status: 'Active',
+      });
+
+      if (memberError) {
+        console.log('Admin member creation error:', memberError.message);
+        // Do not cancel the admin request: the admins trigger/request is already created.
+      }
 
       Alert.alert(
         'Request submitted',
@@ -96,6 +144,106 @@ export default function AdminSignUpScreen() {
             Sign-up does not give immediate Admin Panel access. A Full Access Admin must approve the request.
           </Text>
         </View>
+
+        <Text style={styles.label}>FULL NAME</Text>
+        <TextInput
+          value={fullName}
+          onChangeText={setFullName}
+          placeholder="Enter full name"
+          placeholderTextColor="#999"
+          style={styles.input}
+          autoCapitalize="words"
+        />
+
+        <Text style={styles.label}>SECTION</Text>
+        <View style={styles.sectionRow}>
+          {sections.map((item) => {
+            const selected = section === item;
+            return (
+              <Pressable
+                key={item}
+                onPress={() => setSection(item)}
+                style={[styles.sectionOption, selected && styles.sectionOptionActive]}
+              >
+                <Text style={[styles.sectionOptionText, selected && styles.sectionOptionTextActive]}>
+                  {item}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.label}>HOUSE NUMBER</Text>
+        <Pressable
+          onPress={() => setHousePickerOpen(true)}
+          style={[styles.input, styles.selectInput, !houseNumber && styles.selectPlaceholder]}
+        >
+          <Text style={houseNumber ? styles.selectValue : styles.selectPlaceholderText}>
+            {houseNumber || 'Select house number'}
+          </Text>
+          <Text style={styles.selectChevron}>⌄</Text>
+        </Pressable>
+
+        <Modal
+          visible={housePickerOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setHousePickerOpen(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.houseModal}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>Select House Number</Text>
+                  <Text style={styles.modalSubtitle}>Choose your registered house number</Text>
+                </View>
+                <Pressable onPress={() => setHousePickerOpen(false)} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>×</Text>
+                </Pressable>
+              </View>
+
+              <TextInput
+                value={houseSearch}
+                onChangeText={setHouseSearch}
+                placeholder="Search e.g. A25"
+                placeholderTextColor="#999"
+                style={styles.searchInput}
+                autoCapitalize="characters"
+              />
+
+              <View style={styles.blockRow}>
+                {houseBlocks.map((block) => {
+                  const active = houseBlock === block.key;
+                  return (
+                    <Pressable
+                      key={block.key}
+                      onPress={() => { setHouseBlock(block.key); setHouseSearch(''); }}
+                      style={[styles.blockButton, active && styles.blockButtonActive]}
+                    >
+                      <Text style={[styles.blockButtonText, active && styles.blockButtonTextActive]}>{block.key}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.rangeText}>{selectedBlock.key}1 – {selectedBlock.key}{selectedBlock.max}</Text>
+
+              <ScrollView style={styles.houseList} contentContainerStyle={styles.houseGrid} keyboardShouldPersistTaps="handled">
+                {houseOptions.map((item) => (
+                  <Pressable
+                    key={item}
+                    onPress={() => chooseHouseNumber(item)}
+                    style={[styles.houseOption, houseNumber === item && styles.houseOptionActive]}
+                  >
+                    <Text style={[styles.houseOptionText, houseNumber === item && styles.houseOptionTextActive]}>
+                      {item}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
 
         <Text style={styles.label}>Email</Text>
         <TextInput
@@ -177,6 +325,37 @@ const styles = StyleSheet.create({
   noticeText: { color: '#666', fontSize: 12, lineHeight: 18, marginTop: 5 },
   label: { color: '#222', fontSize: 11, fontWeight: '900', marginBottom: 7, marginTop: 12 },
   input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E5E5', borderRadius: 13, paddingHorizontal: 14, paddingVertical: 13, fontSize: 14, color: '#151515' },
+  selectInput: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectPlaceholder: { borderColor: '#E5E5E5' },
+  selectValue: { color: '#151515', fontSize: 14, fontWeight: '700' },
+  selectPlaceholderText: { color: '#999', fontSize: 14 },
+  selectChevron: { color: '#777', fontSize: 22, lineHeight: 20, marginLeft: 8 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.48)', justifyContent: 'flex-end' },
+  houseModal: { backgroundColor: '#F7F7F7', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 18, height: '82%' },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  modalTitle: { color: '#171717', fontSize: 19, fontWeight: '900' },
+  modalSubtitle: { color: '#777', fontSize: 11, marginTop: 3 },
+  closeButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#EDEDED', alignItems: 'center', justifyContent: 'center' },
+  closeButtonText: { color: '#333', fontSize: 26, lineHeight: 28, fontWeight: '300' },
+  searchInput: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E3E3E3', borderRadius: 13, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#151515', marginBottom: 12 },
+  blockRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  blockButton: { flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E2E2', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  blockButtonActive: { backgroundColor: '#C62828', borderColor: '#C62828' },
+  blockButtonText: { color: '#555', fontSize: 13, fontWeight: '900' },
+  blockButtonTextActive: { color: '#FFF' },
+  rangeText: { color: '#888', fontSize: 10, fontWeight: '800', marginBottom: 8 },
+  houseList: { flex: 1 },
+  houseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 20 },
+  houseOption: { width: '18%', minWidth: 52, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E5E5', borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  houseOptionActive: { backgroundColor: '#FFF0F0', borderColor: '#C62828', borderWidth: 2 },
+  houseOptionText: { color: '#333', fontSize: 12, fontWeight: '800' },
+  houseOptionTextActive: { color: '#C62828' },
+
+  sectionRow: { flexDirection: 'row', gap: 8 },
+  sectionOption: { flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E5E5', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  sectionOptionActive: { borderColor: '#C62828', backgroundColor: '#FFF4F4', borderWidth: 2 },
+  sectionOptionText: { color: '#666', fontSize: 11, fontWeight: '800' },
+  sectionOptionTextActive: { color: '#C62828' },
   roleRow: { flexDirection: 'row', gap: 10 },
   roleCard: { flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E5E5', borderRadius: 16, padding: 13, minHeight: 155 },
   roleCardActive: { borderColor: '#C62828', borderWidth: 2 },
