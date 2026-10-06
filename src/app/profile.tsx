@@ -34,6 +34,14 @@ export default function ProfileScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [familyMembers, setFamilyMembers] = useState<Array<{
+    full_name: string | null;
+    relationship: string | null;
+    house_number: string | null;
+    phone: string | null;
+    section: string | null;
+  }>>([]);
+  const [familyLoading, setFamilyLoading] = useState(false);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -50,6 +58,19 @@ export default function ProfileScreen() {
       }
 
       setEmail(user.email ?? '');
+
+      setFamilyLoading(true);
+      const { data: familyData, error: familyError } = await supabase
+        .from('members')
+        .select('full_name, relationship, house_number, phone, section')
+        .eq('registered_by_user_id', user.id)
+        .eq('registration_type', 'family_member')
+        .order('full_name', { ascending: true });
+      if (familyError) {
+        console.log('Family members error:', familyError.message);
+      }
+      setFamilyMembers((familyData as typeof familyMembers) || []);
+      setFamilyLoading(false);
 
       const { data, error } = await supabase
         .from('members')
@@ -609,7 +630,71 @@ export default function ProfileScreen() {
         badge
       />
 
-      {/* Membership Status */}
+      {/* Register Family Member */}
+      <Pressable
+        onPress={() => router.push('/register-family-member')}
+        style={styles.familyRegisterCard}
+        activeOpacity={0.85}
+      >
+        <View style={styles.familyRegisterIcon}>
+          <Text style={styles.familyRegisterIconText}>+</Text>
+        </View>
+        <View style={styles.familyRegisterContent}>
+          <Text style={styles.familyRegisterTitle}>Register Family Member</Text>
+          <Text style={styles.familyRegisterSubtitle}>
+            I member nih chuan in chhungte, nu leh pa te pawh register ve theih a ni.
+          </Text>
+        </View>
+        <Text style={styles.familyRegisterArrow}>›</Text>
+      </Pressable>
+
+      {/* My Family Members */}
+      <View style={styles.familyListCard}>
+        <View style={styles.familyListHeader}>
+          <View style={styles.familyListIcon}>
+            <Text style={styles.familyListIconText}>👨‍👩‍👧‍👦</Text>
+          </View>
+          <View style={styles.familyListHeaderText}>
+            <Text style={styles.familyListTitle}>My Family Members</Text>
+            <Text style={styles.familyListSubtitle}>I member-in register sak te</Text>
+          </View>
+          <View style={styles.familyCountPill}>
+            <Text style={styles.familyCountText}>{familyMembers.length}</Text>
+          </View>
+        </View>
+
+        {familyLoading ? (
+          <Text style={styles.familyEmptyText}>Loading family members...</Text>
+        ) : familyMembers.length === 0 ? (
+          <View style={styles.familyEmptyBox}>
+            <Text style={styles.familyEmptyText}>Family member register sak la i awm lo.</Text>
+          </View>
+        ) : (
+          <View style={styles.familyList}>
+            {familyMembers.map((item, index) => (
+              <View key={`${item.full_name || 'member'}-${index}`} style={styles.familyMemberRow}>
+                <View style={styles.familyAvatar}>
+                  <Text style={styles.familyAvatarText}>
+                    {(item.full_name || '?').trim().charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.familyMemberInfo}>
+                  <Text style={styles.familyMemberName} numberOfLines={1}>
+                    {item.full_name || 'Unnamed member'}
+                  </Text>
+                  <Text style={styles.familyMemberMeta}>
+                    {item.relationship || 'Family'} • {item.house_number || houseNumber}
+                  </Text>
+                  <Text style={styles.familyMemberMetaSmall}>
+                    {item.section || 'Section not assigned'}{item.phone ? ` • ${item.phone}` : ''}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
       <View style={styles.infoCard}>
         <View style={styles.iconBox}>
           <Text style={styles.icon}>
@@ -1195,6 +1280,58 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 13,
   },
+
+  familyListCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E9E9E9',
+    borderRadius: 18,
+    padding: 15,
+    marginBottom: 14,
+  },
+  familyListHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  familyListIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: '#FFF1F1', alignItems: 'center', justifyContent: 'center', marginRight: 11 },
+  familyListIconText: { fontSize: 20 },
+  familyListHeaderText: { flex: 1 },
+  familyListTitle: { color: '#7F1D1D', fontSize: 14, fontWeight: '900' },
+  familyListSubtitle: { color: '#888', fontSize: 10, marginTop: 3 },
+  familyCountPill: { minWidth: 32, height: 28, borderRadius: 14, backgroundColor: '#C62828', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9 },
+  familyCountText: { color: '#FFF', fontSize: 12, fontWeight: '900' },
+  familyList: { gap: 8 },
+  familyMemberRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAFAFA', borderRadius: 14, padding: 10, borderWidth: 1, borderColor: '#F0F0F0' },
+  familyAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#C62828', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  familyAvatarText: { color: '#FFF', fontSize: 15, fontWeight: '900' },
+  familyMemberInfo: { flex: 1 },
+  familyMemberName: { color: '#222', fontSize: 13, fontWeight: '900' },
+  familyMemberMeta: { color: '#666', fontSize: 10, marginTop: 3, fontWeight: '700' },
+  familyMemberMetaSmall: { color: '#999', fontSize: 9, marginTop: 2 },
+  familyEmptyBox: { backgroundColor: '#FAFAFA', borderRadius: 12, padding: 12 },
+  familyEmptyText: { color: '#888', fontSize: 10, textAlign: 'center', paddingVertical: 5 },
+
+  familyRegisterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF7F7',
+    borderWidth: 1,
+    borderColor: '#F0C8C8',
+    borderRadius: 18,
+    padding: 15,
+    marginBottom: 14,
+  },
+  familyRegisterIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#C62828',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  familyRegisterIconText: { color: '#FFF', fontSize: 27, fontWeight: '300', lineHeight: 30 },
+  familyRegisterContent: { flex: 1 },
+  familyRegisterTitle: { color: '#7F1D1D', fontSize: 14, fontWeight: '900' },
+  familyRegisterSubtitle: { color: '#777', fontSize: 11, lineHeight: 17, marginTop: 3 },
+  familyRegisterArrow: { color: '#C62828', fontSize: 28, fontWeight: '300', marginLeft: 8 },
 
   footerCard: {
     marginHorizontal: 18,
