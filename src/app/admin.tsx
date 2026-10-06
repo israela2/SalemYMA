@@ -1437,7 +1437,6 @@ export default function AdminScreen() {
        */
       const [
         membersResult,
-        approvedAdminsResult,
         galleryResult,
         newsResult,
         eventsResult,
@@ -1448,21 +1447,10 @@ export default function AdminScreen() {
         cemeteryResult,
         gasBookingsResult,
       ] = await Promise.all([
-        supabase
-          .from('members')
-          .select('*')
-          .order('created_at', {
-            ascending: false,
-          }),
-
-        // Approved administrators are YMA members too. Merge them into the
-        // same Member List using user_id so an admin who already has a member
-        // row is shown only once.
-        supabase
-          .from('admins')
-          .select('user_id, role, status, created_at')
-          .eq('status', 'approved')
-          .in('role', ['full_admin', 'cemetery_admin']),
+        // IMPORTANT: use the same canonical member directory RPC used by
+        // Member Statistics. This prevents count/list drift caused by RLS,
+        // approved-admin rows, or duplicate user_id records.
+        supabase.rpc('get_member_directory'),
 
         supabase
           .from('gallery')
@@ -1530,64 +1518,11 @@ export default function AdminScreen() {
       if (generation !== loadGeneration.current) return;
 
       if (!membersResult.error) {
-        const memberRows = (membersResult.data || []) as Member[];
-        const mergedMembers = new Map<string, Member>();
-        const standaloneMembers: Member[] = [];
-
-        memberRows.forEach((member) => {
-          if (member.user_id) {
-            mergedMembers.set(String(member.user_id), member);
-          } else {
-            standaloneMembers.push(member);
-          }
-        });
-
-        // IMPORTANT: Approved administrators are members too.
-        // Build the exact same merged directory that the Member List displays.
-        // This guarantees the number shown in Members Management is also the
-        // number represented by the member directory: normal members + admins,
-        // with an existing admin/member user_id counted only once.
-        if (approvedAdminsResult.error) {
-          console.log('Approved admin member load error:', approvedAdminsResult.error.message);
-        }
-
-        (approvedAdminsResult.data || []).forEach((admin: any, index: number) => {
-          if (!admin.user_id) return;
-          const userId = String(admin.user_id);
-          const existing = mergedMembers.get(userId);
-
-          if (existing) {
-            mergedMembers.set(userId, {
-              ...existing,
-              admin_role: admin.role,
-            });
-            return;
-          }
-
-          const isFullAdmin = admin.role === 'full_admin';
-          mergedMembers.set(userId, {
-            id: -(index + 1),
-            user_id: userId,
-            full_name: isFullAdmin ? 'Full Access Admin' : 'Cemetery Admin',
-            email: null,
-            phone: null,
-            branch_name: 'YMA Salem Branch',
-            section: null,
-            house_number: null,
-            status: 'Active',
-            created_at: admin.created_at || null,
-            admin_role: admin.role,
-          });
-        });
-
-        // This is the SINGLE source used by the Admin Member List.
-        const mergedMemberList = [
-          ...standaloneMembers,
-          ...Array.from(mergedMembers.values()),
-        ];
+        const rpcRows = Array.isArray(membersResult.data) ? membersResult.data : [];
+        const mergedMemberList = rpcRows as Member[];
         setMembers(mergedMemberList);
         console.log(
-          `Member directory loaded: ${mergedMemberList.length} total (${memberRows.length} member rows + ${(approvedAdminsResult.data || []).length} approved admins, de-duplicated by user_id).`,
+          `Member directory loaded from canonical RPC: ${mergedMemberList.length} total.`,
         );
       } else {
         console.log('Members load error:', membersResult.error?.message);
